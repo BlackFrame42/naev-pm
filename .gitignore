@@ -5,3 +5,5 @@ venv
 .env
 .vscode
 *.egg-info
+build/
+.idea

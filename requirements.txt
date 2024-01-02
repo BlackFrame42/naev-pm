@@ -1,3 +1,10 @@
 pygit2
-click
 lxml
+appdirs
+Pillow
+
+# install tkinter with your system distribution's package manager
+
+# CLI:
+click
+tabulate

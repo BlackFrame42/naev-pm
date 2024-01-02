@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "naevpm"
+version = "0.2.0"
+description = "Naev Package Manager"
+authors = [
+    { name = "Lemuria" },
+    { name = "BlackFrame" }
+]
+
+dependencies = [
+    "pygit2",
+    "lxml",
+    "appdirs",
+    "Pillow",
+    "click",
+    "tabulate"
+]
+license = "MIT"
+
+[project.scripts]
+naevpm = "naevpm.cli:root"
+
+[project.gui-scripts]
+naevpm-gui = "naevpm.gui.start:start_gui"
