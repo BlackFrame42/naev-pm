@@ -57,5 +57,5 @@ It creates the cli commands 'naevpm' and 'naevpm-gui'.
 
 # Example screenshots
 
-![GUI Screen Shots](/home/me/Documents/naev-dev/naev-pm/gui1.png "GUI Screen Shots")
-![GUI Screen Shots](/home/me/Documents/naev-dev/naev-pm/gui2.png "GUI Screen Shots")
+![GUI Screen Shots](gui1.png "GUI Screen Shots")
+![GUI Screen Shots](gui2.png "GUI Screen Shots")
