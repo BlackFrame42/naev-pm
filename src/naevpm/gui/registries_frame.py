@@ -4,6 +4,7 @@ from naevpm.core.config import Config
 from naevpm.core.models import registry_fields, RegistryDbModel
 from naevpm.gui.abstract_gui_controller import AbstractGuiController
 from naevpm.gui.add_registry_window import AddRegistryWindow
+from naevpm.gui.data_model_to_str_list import registry_to_str_list
 from naevpm.gui.display_utils import display_last_datetime, field_name_as_list_header
 from naevpm.gui.synced_tree_view import SyncedTreeView
 
@@ -48,16 +49,11 @@ class RegistriesFrame(ttk.Frame):
         list_frame.columnconfigure(0, weight=1)
         list_frame.rowconfigure(0, weight=1)
 
-        def registry_values(r: RegistryDbModel) -> list[str]:
-            source = r.source
-            last_fetched = display_last_datetime(r.last_fetched)
-            return [source, last_fetched]
-
         def get_object_identifier(r: RegistryDbModel):
             return r.source
 
         self._registries_list = SyncedTreeView(
-            get_str_values_fn=registry_values,
+            get_str_values_fn=registry_to_str_list,
             get_object_identifier_fn=get_object_identifier,
             master=list_frame,
             columns=registry_fields,

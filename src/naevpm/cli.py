@@ -12,6 +12,7 @@ from naevpm.core.directories import Directories
 from naevpm.core.models import PluginDbModel, RegistryDbModel
 from naevpm.core.sqlite_database_connector import SqliteDatabaseConnector
 from naevpm.gui import display_utils
+from naevpm.gui.data_model_to_str_list import registry_to_str_list, plugin_to_str_list
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -63,47 +64,15 @@ def registry():
 def create_plugin_table(plugins: list[PluginDbModel]):
     table = []
     for p in plugins:
-        table.append(create_plugin_row(p))
+        table.append(plugin_to_str_list(p))
     return table
 
 
 def create_registry_table(registries: list[RegistryDbModel]):
     table = []
     for r in registries:
-        table.append(create_registry_row(r))
+        table.append(registry_to_str_list(r))
     return table
-
-
-def create_registry_row(registry: RegistryDbModel):
-    obj = registry.__dict__
-    row = []
-    for registry_field in models.registry_fields:
-        if registry_field == 'last_fetched':
-            value = display_utils.display_last_datetime(obj[registry_field])
-        else:
-            value = obj[registry_field]
-        if value is None:
-            value = ''
-        row.append(value)
-    return row
-
-
-def create_plugin_row(plugin: PluginDbModel) -> list[str]:
-    obj = plugin.__dict__
-    row = []
-    for field in models.plugin_fields:
-        if field == 'installed' or \
-                field == 'cached' or \
-                field == 'update_available':
-            value = display_utils.display_boolean(obj[field])
-        elif field == 'state':
-            value = plugin.state.name
-        else:
-            value = obj[field]
-        if value is None:
-            value = ''
-        row.append(value)
-    return row
 
 
 @registry.command("list")
@@ -116,11 +85,11 @@ def registry_list():
 @registry.command("fetch")
 @click.argument("source")
 def registry_fetch(source: str):
-    registry = database_connector.get_registry(source.strip())
-    if registry is None:
+    r = database_connector.get_registry(source.strip())
+    if r is None:
         logger.warning('Could not fetch as registry is not added')
     else:
-        logic.fetch_registry_plugin_metadatas(registry, comm)
+        logic.fetch_registry_plugin_metadatas(r, comm)
 
 
 @registry.command("fetch-all")
@@ -179,92 +148,92 @@ def plugin_list():
 @plugin.command('delete')
 @click.argument("source")
 def plugin_delete(source: str):
-    plugin = logic.get_plugin(source)
-    if plugin is None:
+    p = logic.get_plugin(source)
+    if p is None:
         logger.warning('Plugin is not in index')
     else:
         try:
-            logic.delete_plugin_from_cache(plugin, comm)
+            logic.delete_plugin_from_cache(p, comm)
         except AssertionError:
-            logger.error(f'Operation invalid for state {plugin.state.name} of plugin.')
+            logger.error(f'Operation invalid for state {p.state.name} of plugin.')
 
 
 @plugin.command('fetch')
 @click.argument("source")
 def plugin_fetch(source: str):
-    plugin = logic.get_plugin(source)
-    if plugin is None:
+    p = logic.get_plugin(source)
+    if p is None:
         logger.warning('Plugin is not in index')
     else:
         try:
-            logic.fetch_plugin(plugin, comm)
+            logic.fetch_plugin(p, comm)
         except AssertionError:
-            logger.error(f'Operation invalid for state {plugin.state.name} of plugin.')
+            logger.error(f'Operation invalid for state {p.state.name} of plugin.')
 
 
 @plugin.command('install')
 @click.argument("source")
 def plugin_install(source: str):
-    plugin = logic.get_plugin(source)
-    if plugin is None:
+    p = logic.get_plugin(source)
+    if p is None:
         logger.warning('Plugin is not in index')
     else:
         try:
-            logic.install_plugin_from_cache(plugin, comm)
+            logic.install_plugin_from_cache(p, comm)
         except AssertionError:
-            logger.error(f'Operation invalid for state {plugin.state.name} of plugin.')
+            logger.error(f'Operation invalid for state {p.state.name} of plugin.')
 
 
 @plugin.command('remove')
 @click.argument("source")
 def plugin_remove(source: str):
-    plugin = logic.get_plugin(source)
-    if plugin is None:
+    p = logic.get_plugin(source)
+    if p is None:
         logger.warning('Plugin is not in index')
     else:
         try:
-            logic.remove_plugin_from_index(plugin, comm)
+            logic.remove_plugin_from_index(p, comm)
         except AssertionError:
-            logger.error(f'Operation invalid for state {plugin.state.name} of plugin.')
+            logger.error(f'Operation invalid for state {p.state.name} of plugin.')
 
 
 @plugin.command('uninstall')
 @click.argument("source")
 def plugin_uninstall(source: str):
-    plugin = logic.get_plugin(source)
-    if plugin is None:
+    p = logic.get_plugin(source)
+    if p is None:
         logger.warning('Plugin is not in index')
     else:
         try:
-            logic.uninstall_plugin(plugin, comm)
+            logic.uninstall_plugin(p, comm)
         except AssertionError:
-            logger.error(f'Operation invalid for state {plugin.state.name} of plugin.')
+            logger.error(f'Operation invalid for state {p.state.name} of plugin.')
 
 
 @plugin.command('update')
 @click.argument("source")
 def plugin_update(source: str):
-    plugin = logic.get_plugin(source)
-    if plugin is None:
+    p = logic.get_plugin(source)
+    if p is None:
         logger.warning('Plugin is not in index')
     else:
         try:
-            logic.update_plugin(plugin, comm)
+            logic.update_plugin(p, comm)
         except AssertionError:
-            logger.error(f'Operation invalid for state {plugin.state.name} of plugin.')
+            logger.error(f'Operation invalid for state {p.state.name} of plugin.')
 
 
 @plugin.command('check-for-update')
 @click.argument("source")
 def plugin_check_for_update(source: str):
-    plugin = logic.get_plugin(source)
-    if plugin is None:
+    p = logic.get_plugin(source)
+    if p is None:
         logger.warning('Plugin is not in index')
     else:
         try:
-            logic.check_for_plugin_update(plugin, comm)
+            logic.check_for_plugin_update(p, comm)
         except AssertionError:
-            logger.error(f'Operation invalid for state {plugin.state.name} of plugin.')
+            logger.error(f'Operation invalid for state {p.state.name} of plugin.')
 
 
 @plugin.command('check-all-for-update')

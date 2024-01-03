@@ -3,6 +3,7 @@ from tkinter import ttk, E, DISABLED, NORMAL
 from naevpm.core.config import Config
 from naevpm.core.models import plugin_fields, PluginDbModel, PluginState
 from naevpm.gui.abstract_gui_controller import AbstractGuiController
+from naevpm.gui.data_model_to_str_list import plugin_to_str_list
 from naevpm.gui.display_utils import field_name_as_list_header, display_boolean
 from naevpm.gui.synced_tree_view import SyncedTreeView
 from naevpm.gui.tk_root import TkRoot
@@ -35,25 +36,12 @@ class PluginsFrame(ttk.Frame):
         list_frame.columnconfigure(0, weight=1)
         list_frame.rowconfigure(0, weight=1)
 
-        def plugin_values(plugin: PluginDbModel) -> list[str]:
-            values = []
-            obj = plugin.__dict__
-            for f in plugin_fields:
-                if f == 'installed' or \
-                        f == 'cached' or \
-                        f == 'update_available':
-                    values.append(display_boolean(obj[f]))
-                elif f == 'state':
-                    values.append(plugin.state.name)
-                else:
-                    values.append(obj[f])
-            return values
 
         def get_object_identifier(r: PluginDbModel):
             return r.source
 
         self._plugins_list = SyncedTreeView(
-            get_str_values_fn=plugin_values,
+            get_str_values_fn=plugin_to_str_list,
             get_object_identifier_fn=get_object_identifier,
             master=list_frame,
             columns=plugin_fields,
