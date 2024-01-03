@@ -2,8 +2,10 @@
 *.pyc
 __pycache__
 venv
+.venv
 .env
 .vscode
 *.egg-info
 build/
 .idea
+src/.coverage

@@ -8,3 +8,6 @@ Pillow
 # CLI:
 click
 tabulate
+
+# Development:
+# coverage

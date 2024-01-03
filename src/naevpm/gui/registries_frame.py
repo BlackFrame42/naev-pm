@@ -5,22 +5,18 @@ from naevpm.core.models import registry_fields, RegistryDbModel
 from naevpm.gui.abstract_gui_controller import AbstractGuiController
 from naevpm.gui.add_registry_window import AddRegistryWindow
 from naevpm.gui.display_utils import display_last_datetime, field_name_as_list_header
+from naevpm.gui.synced_tree_view import SyncedTreeView
 
 from naevpm.gui.tk_root import TkRoot
 from naevpm.gui.treeview_context_menu import TreeviewContextMenu
 
 
 class RegistriesFrame(ttk.Frame):
-    _registries_list: ttk.Treeview
-    _iid_registry_map: dict[str, RegistryDbModel]
-    _source_iid_map: dict[str, str]
+    _registries_list: SyncedTreeView
     add_registry_window: AddRegistryWindow
 
     def __init__(self, parent: ttk.Widget, root: TkRoot, gui_controller: AbstractGuiController, **kwargs):
         super().__init__(parent, **kwargs)
-
-        self._iid_registry_map = {}
-        self._source_iid_map = {}
 
         # The additional window to add registries will already be prepared and exists only once.
         self.add_registry_window = AddRegistryWindow(root, gui_controller)
@@ -39,7 +35,7 @@ class RegistriesFrame(ttk.Frame):
         add_button.grid(column=0, row=0, sticky=E, **Config.GLOBAL_GRID_PADDING)
 
         def fetch_plugin_metadata_from_all_registries():
-            for iid, registry in self._iid_registry_map.items():
+            for registry in self._registries_list.get_all_objects():
                 gui_controller.fetch_registry_plugin_metadatas(registry)
 
         fetch_all_button = ttk.Button(buttons_frame, text="Fetch plugin metadata from all registries",
@@ -52,7 +48,20 @@ class RegistriesFrame(ttk.Frame):
         list_frame.columnconfigure(0, weight=1)
         list_frame.rowconfigure(0, weight=1)
 
-        self._registries_list = ttk.Treeview(list_frame, columns=registry_fields, show='headings')
+        def registry_values(r: RegistryDbModel) -> list[str]:
+            source = r.source
+            last_fetched = display_last_datetime(r.last_fetched)
+            return [source, last_fetched]
+
+        def get_object_identifier(r: RegistryDbModel):
+            return r.source
+
+        self._registries_list = SyncedTreeView(
+            get_str_values_fn=registry_values,
+            get_object_identifier_fn=get_object_identifier,
+            master=list_frame,
+            columns=registry_fields,
+            show='headings')
         list_scrollbar = ttk.Scrollbar(list_frame,
                                        orient="vertical",
                                        command=self._registries_list.yview)
@@ -64,7 +73,7 @@ class RegistriesFrame(ttk.Frame):
         list_item_context_menu = TreeviewContextMenu(self._registries_list, root, lambda iid: None)
 
         def remove_registry():
-            registry = self._iid_registry_map[list_item_context_menu.item_id]
+            registry = self._registries_list.get_object_by_iid(list_item_context_menu.item_id)
             gui_controller.remove_registry(registry)
 
         list_item_context_menu.add_command(
@@ -72,41 +81,25 @@ class RegistriesFrame(ttk.Frame):
             command=remove_registry)
 
         def fetch_plugin_metadata_from_registry():
-            registry = self._iid_registry_map[list_item_context_menu.item_id]
+            registry = self._registries_list.get_object_by_iid(list_item_context_menu.item_id)
             gui_controller.fetch_registry_plugin_metadatas(registry)
 
         list_item_context_menu.add_command(
             label='Fetch registry index',
             command=fetch_plugin_metadata_from_registry)
 
-    def _registry_values(self, registry: RegistryDbModel) -> list[str]:
-        source = registry.source
-        last_fetched = display_last_datetime(registry.last_fetched)
-        return [source, last_fetched]
-
     # Functions for use by GUI controller -----------------------------------------
-    def insert_registry(self, registry: RegistryDbModel):
-        iid = self._registries_list.insert('', 'end', values=self._registry_values(registry))
-        self._iid_registry_map[iid] = registry
-        self._source_iid_map[registry.source] = iid
+    def put_registry(self, registry: RegistryDbModel):
+        self._registries_list.sync_put(registry)
 
-    def set_registries(self, registries: list[RegistryDbModel]):
-        self.clear_registries()
-        for registry in registries:
-            self.insert_registry(registry)
+    def put_registries(self, registries: list[RegistryDbModel]):
+        self._registries_list.sync_put_all(registries)
 
     def clear_registries(self):
-        self._registries_list.delete(*self._registries_list.get_children())
-        self._iid_registry_map = {}
-        self._source_iid_map = {}
+        self._registries_list.sync_clear()
 
-    def set_registry(self, registry: RegistryDbModel):
-        iid = self._source_iid_map[registry.source]
-        self._registries_list.item(iid, values=self._registry_values(registry))
+    def update_registry(self, registry: RegistryDbModel):
+        self._registries_list.sync_update(registry)
 
     def remove_registry(self, registry: RegistryDbModel):
-        iid = self._source_iid_map[registry.source]
-        self._registries_list.delete(iid)
-
-        del self._iid_registry_map[iid]
-        del self._source_iid_map[registry.source]
+        self._registries_list.sync_remove(registry)

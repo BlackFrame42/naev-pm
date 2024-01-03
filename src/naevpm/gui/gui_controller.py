@@ -44,7 +44,7 @@ class GuiController(AbstractGuiController):
         def callback(registry: RegistryDbModel, e: Optional[Exception] = None):
             if e is None:
                 self.registries_frame.add_registry_window.withdraw()
-                self.registries_frame.insert_registry(registry)
+                self.registries_frame.put_registry(registry)
             else:
                 if isinstance(e, ApplicationLogicRegistrySourceWasAlreadyAdded):
                     messagebox.showerror(parent=self.registries_frame.add_registry_window,
@@ -70,7 +70,7 @@ class GuiController(AbstractGuiController):
             if e is not None:
                 self.show_status(f'Unhandled error occurred: {str(e)}')
                 raise e
-            self.registries_frame.set_registries(registries)
+            self.registries_frame.put_registries(registries)
 
         self.tk_threading.run_threaded_task('refresh_registries_list', task, callback)
 
@@ -96,7 +96,7 @@ class GuiController(AbstractGuiController):
             if e is not None:
                 self.show_status(f'Unhandled error occurred: {str(e)}')
                 raise e
-            self.registries_frame.set_registry(registry)
+            self.registries_frame.update_registry(registry)
             self.refresh_plugins_list()
 
         self.tk_threading.run_threaded_task('fetch_registry_plugin_metadatas', task, callback)
@@ -110,7 +110,7 @@ class GuiController(AbstractGuiController):
             if e is not None:
                 self.show_status(f'Unhandled error occurred: {str(e)}')
                 raise e
-            self.plugins_frame.set_plugins(plugins)
+            self.plugins_frame.put_plugins(plugins)
 
         self.tk_threading.run_threaded_task('refresh_plugins_list', task, callback)
 
@@ -122,7 +122,7 @@ class GuiController(AbstractGuiController):
             # Reraise in GUI thread if not handled
             if e is not None:
                 raise e
-            self.plugins_frame.set_plugin(plugin)
+            self.plugins_frame.update_plugin(plugin)
 
         self.tk_threading.run_threaded_task('install_plugin_from_cache', task, callback)
 
@@ -135,7 +135,7 @@ class GuiController(AbstractGuiController):
             if e is not None:
                 self.show_status(f'Unhandled error occurred: {str(e)}')
                 raise e
-            self.plugins_frame.set_plugin(plugin)
+            self.plugins_frame.update_plugin(plugin)
 
         self.tk_threading.run_threaded_task('uninstall_plugin', task, callback)
 
@@ -148,7 +148,7 @@ class GuiController(AbstractGuiController):
             if e is not None:
                 self.show_status(f'Unhandled error occurred: {str(e)}')
                 raise e
-            self.plugins_frame.set_plugin(plugin)
+            self.plugins_frame.update_plugin(plugin)
 
         self.tk_threading.run_threaded_task('delete_plugin_from_cache', task, callback)
 
@@ -161,7 +161,7 @@ class GuiController(AbstractGuiController):
             if e is not None:
                 self.show_status(f'Unhandled error occurred: {str(e)}')
                 raise e
-            self.plugins_frame.set_plugin(plugin)
+            self.plugins_frame.update_plugin(plugin)
 
         self.tk_threading.run_threaded_task('check_for_plugin_update', task, callback)
 
@@ -174,7 +174,7 @@ class GuiController(AbstractGuiController):
             if e is not None:
                 self.show_status(f'Unhandled error occurred: {str(e)}')
                 raise e
-            self.plugins_frame.set_plugin(plugin)
+            self.plugins_frame.update_plugin(plugin)
 
         self.tk_threading.run_threaded_task('update_plugin', task, callback)
 
@@ -192,7 +192,7 @@ class GuiController(AbstractGuiController):
             if e is not None:
                 self.show_status(f'Unhandled error occurred: {str(e)}')
                 raise e
-            self.plugins_frame.set_plugin(plugin)
+            self.plugins_frame.update_plugin(plugin)
 
         self.tk_threading.run_threaded_task('fetch_plugin', task, callback)
 
