@@ -1,4 +1,4 @@
-from typing import Callable, TypeVar
+from typing import Callable, TypeVar, Optional
 
 T = TypeVar('T')
 
@@ -63,3 +63,12 @@ class TkIidObjSync:
 
     def get_all_item_iids(self) -> list[str]:
         return list(self._iid_to_object_map.keys())
+
+    def is_empty(self) -> bool:
+        return len(self._objects) == 0
+
+    def get_last_iid(self) -> Optional[str]:
+        iids = self.get_all_item_iids()
+        if len(iids) > 0:
+            return iids[-1]
+        return None

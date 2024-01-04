@@ -48,6 +48,10 @@ def start_gui():
     gui_controller.refresh_registries_list()
     gui_controller.refresh_plugins_list()
 
+    # Stop dynamic window resizing when contents change in size
+    root.update()
+    root.geometry(root.geometry())
+
     root.mainloop()
 
 

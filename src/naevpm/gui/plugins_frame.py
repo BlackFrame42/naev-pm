@@ -1,4 +1,4 @@
-from tkinter import ttk, E, DISABLED, NORMAL
+from tkinter import ttk, E, DISABLED, NORMAL, StringVar, Event, font
 
 from naevpm.core.config import Config
 from naevpm.core.models import plugin_fields, PluginDbModel, PluginState
@@ -11,11 +11,13 @@ from naevpm.gui.treeview_context_menu import TreeviewContextMenu
 
 
 class PluginsFrame(ttk.Frame):
-    _plugins_list: SyncedTreeView
+    _plugins_list: SyncedTreeView[PluginDbModel]
+
+    plugin_name_var: StringVar
 
     def __init__(self, parent: ttk.Widget, root: TkRoot, gui_controller: AbstractGuiController, **kwargs):
         super().__init__(parent, **kwargs)
-
+        self.plugin_name_var = StringVar()
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
@@ -30,12 +32,17 @@ class PluginsFrame(ttk.Frame):
         check_for_updates_button = ttk.Button(buttons_frame, text="Check for updates", command=check_for_updates)
         check_for_updates_button.grid(column=0, row=0, sticky=E, **Config.GLOBAL_GRID_PADDING)
 
-        # Plugins list ----------------------------------------------
-        list_frame = ttk.Frame(self)
-        list_frame.grid(column=0, row=1, sticky='NSEW', **Config.GLOBAL_GRID_PADDING)
-        list_frame.columnconfigure(0, weight=1)
-        list_frame.rowconfigure(0, weight=1)
+        content_frame = ttk.Frame(self)
+        content_frame.grid(column=0, row=1, sticky='NSEW', **Config.GLOBAL_GRID_PADDING)
+        content_frame.columnconfigure(0, weight=1)
+        content_frame.rowconfigure(0, weight=1)
 
+        # Plugins list ----------------------------------------------
+        list_frame = ttk.Frame(content_frame)
+        list_frame.grid(column=0, row=0, sticky='NSEW', **Config.GLOBAL_GRID_PADDING)
+        list_frame.columnconfigure(0, weight=1)
+        list_frame.columnconfigure(1, weight=1)
+        list_frame.rowconfigure(0, weight=1)
 
         def get_object_identifier(r: PluginDbModel):
             return r.source
@@ -43,10 +50,11 @@ class PluginsFrame(ttk.Frame):
         self._plugins_list = SyncedTreeView(
             get_str_values_fn=plugin_to_str_list,
             get_object_identifier_fn=get_object_identifier,
-            master=list_frame,
+            master=content_frame,
             columns=plugin_fields,
-            show='headings')
-        plugin_list_scrollbar = ttk.Scrollbar(list_frame,
+            show='headings',
+            selectmode='browse')
+        plugin_list_scrollbar = ttk.Scrollbar(content_frame,
                                               orient="vertical",
                                               command=self._plugins_list.yview)
         plugin_list_scrollbar.grid(column=1, row=0, sticky='NSE')
@@ -87,9 +95,31 @@ class PluginsFrame(ttk.Frame):
 
         self.list_item_context_menu = TreeviewContextMenu(self._plugins_list, root, configure_context_menu)
 
+        plugin_details_frame = ttk.Frame(content_frame, )
+
+        plugin_details_frame.grid(column=3, row=0, sticky='NES', **Config.GLOBAL_GRID_PADDING)
+        plugin_details_frame.columnconfigure(0, weight=1)
+        # plugin_details_frame.rowconfigure(0, weight=1)
+
+        name_label = ttk.Label(plugin_details_frame, text="Name")
+        name_label.grid(column=0, row=0, sticky='NEW', **Config.GLOBAL_GRID_PADDING)
+
+        bold_font = font.Font(weight="bold")
+
+        name_text = ttk.Label(plugin_details_frame, textvariable=self.plugin_name_var, font=bold_font)
+        name_text.grid(column=0, row=1, sticky='NEW', **Config.GLOBAL_GRID_PADDING)
+
+        def show_plugin_details(ev: Event):
+            plugin = self._plugins_list.get_selected_object()
+            if plugin is not None:
+                self.plugin_name_var.set(plugin.name)
+
+        self._plugins_list.bind("<<TreeviewSelect>>", show_plugin_details)
+
         def remove_plugin_from_index():  # 0
             plugin = self._plugins_list.get_object_by_iid(self.list_item_context_menu.item_id)
             gui_controller.remove_plugin_from_index(plugin)
+            self._plugins_list.focus_set()
 
         self.list_item_context_menu.add_command(label='Remove plugin from index',
                                                 command=remove_plugin_from_index,

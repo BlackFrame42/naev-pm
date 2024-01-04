@@ -57,7 +57,8 @@ class RegistriesFrame(ttk.Frame):
             get_object_identifier_fn=get_object_identifier,
             master=list_frame,
             columns=registry_fields,
-            show='headings')
+            show='headings',
+            selectmode='browse')
         list_scrollbar = ttk.Scrollbar(list_frame,
                                        orient="vertical",
                                        command=self._registries_list.yview)
@@ -71,6 +72,8 @@ class RegistriesFrame(ttk.Frame):
         def remove_registry():
             registry = self._registries_list.get_object_by_iid(list_item_context_menu.item_id)
             gui_controller.remove_registry(registry)
+            self._registries_list.focus_set()
+
 
         list_item_context_menu.add_command(
             label='Remove registry',
@@ -79,6 +82,7 @@ class RegistriesFrame(ttk.Frame):
         def fetch_plugin_metadata_from_registry():
             registry = self._registries_list.get_object_by_iid(list_item_context_menu.item_id)
             gui_controller.fetch_registry_plugin_metadatas(registry)
+            # self.focus_set()
 
         list_item_context_menu.add_command(
             label='Fetch registry index',

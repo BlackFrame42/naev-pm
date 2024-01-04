@@ -20,9 +20,15 @@ class NaevPmFrame(ttk.Frame):
         notebook = ttk.Notebook(self)
         self.registries_frame = RegistriesFrame(notebook, root, gui_controller)
         self.plugins_frame = PluginsFrame(notebook, root, gui_controller)
-        notebook.add(self.registries_frame, text='Registries')
-        notebook.add(self.plugins_frame, text='Plugins')
+        notebook.add(self.registries_frame, text='Registries', underline=0)
+        notebook.add(self.plugins_frame, text='Plugins', underline=0)
         notebook.grid(column=0, row=0, sticky='NSEW')
+
+        root.bind('<Key-r>', lambda ev: notebook.select(0))
+        root.bind('<Key-R>', lambda ev: notebook.select(0))
+        root.bind('<Key-p>', lambda ev: notebook.select(1))
+        root.bind('<Key-P>', lambda ev: notebook.select(1))
+
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
