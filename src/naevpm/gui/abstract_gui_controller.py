@@ -47,3 +47,6 @@ class AbstractGuiController:
 
     def show_plugin_details(self, plugin: PluginDbModel):
         pass
+
+    def import_existing_plugins_to_index(self):
+        pass

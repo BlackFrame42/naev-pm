@@ -1,4 +1,4 @@
-from tkinter import ttk, E
+from tkinter import ttk
 
 from naevpm.core.config import Config
 from naevpm.core.models import registry_fields, RegistryDbModel
@@ -33,7 +33,13 @@ class RegistriesFrame(ttk.Frame):
         buttons_frame.columnconfigure(0, weight=1)
 
         add_button = ttk.Button(buttons_frame, text="Add repository", command=self.add_registry_window.show)
-        add_button.grid(column=0, row=0, sticky=E, **Config.GLOBAL_GRID_PADDING)
+        add_button.grid(column=0, row=0, sticky='E', **Config.GLOBAL_GRID_PADDING)
+
+        def import_installed_plugins():
+            gui_controller.import_existing_plugins_to_index()
+
+        import_button = ttk.Button(buttons_frame, text="Import installed plugins", command=import_installed_plugins)
+        import_button.grid(column=1, row=0, sticky='E', **Config.GLOBAL_GRID_PADDING)
 
         def fetch_plugin_metadata_from_all_registries():
             for registry in self._registries_list.get_all_objects():
@@ -41,7 +47,7 @@ class RegistriesFrame(ttk.Frame):
 
         fetch_all_button = ttk.Button(buttons_frame, text="Fetch plugin metadata from all registries",
                                       command=fetch_plugin_metadata_from_all_registries)
-        fetch_all_button.grid(column=1, row=0, sticky='E', **Config.GLOBAL_GRID_PADDING)
+        fetch_all_button.grid(column=2, row=0, sticky='E', **Config.GLOBAL_GRID_PADDING)
 
         # Registry list -----------------------------------------
         list_frame = ttk.Frame(self)

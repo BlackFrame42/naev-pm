@@ -6,6 +6,7 @@ class Directories:
     PM_ROOT = appdirs.user_data_dir("naev-package-manager")
     DATABASE = os.path.join(PM_ROOT, "naevpm.db")
     REGISTRIES = os.path.join(PM_ROOT, "registries")
+    LOCAL_REGISTRY = os.path.join(REGISTRIES, 'LOCAL')
     PLUGINS_CACHE = os.path.join(PM_ROOT, "plugins")
 
     NAEV_ROOT = appdirs.user_data_dir("naev")

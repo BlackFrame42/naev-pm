@@ -51,14 +51,14 @@ class RegistryPluginMetaDataModel:
     # noinspection PyShadowingBuiltins
     def __init__(self,
                  name: str,
-                 git: str,
+                 source: str,
                  author: Optional[str] = None,
                  license: Optional[str] = None,
                  website: Optional[str] = None,
                  ):
         super().__init__()
         self.name = name
-        self.source = git
+        self.source = source
         self.author = author
         self.license = license
         self.website = website

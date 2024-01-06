@@ -226,3 +226,18 @@ class GuiController(AbstractGuiController):
             self.plugins_frame.show_plugin_details(plugin, plugin_meta_data)
 
         self.tk_threading.run_threaded_task('remove_plugin_from_index', task, callback)
+
+    def import_existing_plugins_to_index(self):
+        def task(tc: ThreadCommunication):
+            self.application_logic.import_existing_plugins_to_index(tc)
+
+        def callback(return_value, e: Optional[Exception] = None):
+            # Reraise in GUI thread if not handled
+            if e is not None:
+                self.show_status(f'Unhandled error occurred: {str(e)}')
+                raise e
+            self.refresh_plugins_list()
+            self.refresh_registries_list()
+
+        self.tk_threading.run_threaded_task('remove_plugin_from_index', task, callback)
+

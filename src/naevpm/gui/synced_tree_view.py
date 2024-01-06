@@ -16,6 +16,11 @@ class SyncedTreeView(ttk.Treeview, Generic[T]):
         self._get_str_values_fn = get_str_values_fn
         self._sync = TkIidObjSync(get_object_identifier_fn)
 
+        # Set rowheight explicitly to prevent squashed rows
+        self.style = ttk.Style()
+        self.style.theme_use("default")
+        self.style.configure("Treeview", rowheight=30)
+
         def focus_el(ev):
             selection = self.selection()
             if len(selection) > 0:

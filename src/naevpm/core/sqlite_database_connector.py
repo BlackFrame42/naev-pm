@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from sqlite3 import Connection, IntegrityError, Cursor
 from typing import Optional
 
-from naevpm.core.models import PluginDbModel, RegistryDbModel, RegistryPluginMetaDataModel, registry_fields, plugin_fields, \
+from naevpm.core.models import PluginDbModel, RegistryDbModel, RegistryPluginMetaDataModel, registry_fields, \
+    plugin_fields, \
     PluginState
 
 logger = logging.getLogger(__name__)
@@ -83,8 +84,9 @@ class SqliteDatabaseConnector:
 
     def add_registry(self, registry: RegistryDbModel) -> None:
         try:
-            self.db.execute("""INSERT INTO registry (source) VALUES (?)""", [
-                registry.source
+            self.db.execute("""INSERT INTO registry (source, last_fetched) VALUES (?,?)""", [
+                registry.source,
+                registry.last_fetched
             ])
             self.db.commit()
         except IntegrityError as e:
@@ -167,6 +169,14 @@ class SqliteDatabaseConnector:
         return cur.execute(
             f"SELECT {','.join(plugin_fields)} FROM plugin WHERE source = ?", [source]
         ).fetchone()
+
+    def exists_plugin(self, source: str) -> bool:
+        return self.db.execute('SELECT EXISTS(SELECT 1 FROM plugin WHERE source=? LIMIT 1);',
+                               [source]).fetchone()[0]
+
+    def exists_registry(self, source: str) -> bool:
+        return self.db.execute('SELECT EXISTS(SELECT 1 FROM registry WHERE source=? LIMIT 1);',
+                               [source]).fetchone()[0]
 
     def remove_plugin(self, source: str) -> None:
         self.db.execute("DELETE FROM plugin WHERE source = ?", [source])
