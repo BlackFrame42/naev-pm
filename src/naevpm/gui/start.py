@@ -17,7 +17,7 @@ def start_gui():
     locale.setlocale(locale.LC_ALL, '')
     logging.basicConfig(level=logging.INFO)
     # TODO logging configuration file
-    root = TkRoot(title='Naev Package Manager')
+    root = TkRoot(title='Naev Plugin Manager')
 
     database_connector = SqliteDatabaseConnector(Directories.DATABASE)
 
