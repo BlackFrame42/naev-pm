@@ -4,6 +4,43 @@ from typing import Optional
 import inspect
 
 
+class PluginMetaDataModel:
+    name: Optional[str]
+    author: Optional[str]
+    version: Optional[str]
+    description: Optional[str]
+    compatibility: Optional[str]
+    priority: Optional[int]
+    source: Optional[str]
+    blacklist: Optional[list[str]]
+    total_conversion: Optional[bool]
+    whitelist: Optional[list[str]]
+
+    def __init__(self,
+                 name: Optional[str] = None,
+                 author: Optional[str] = None,
+                 version: Optional[str] = None,
+                 description: Optional[str] = None,
+                 compatibility: Optional[str] = None,
+                 priority: Optional[int] = None,
+                 source: Optional[str] = None,
+                 blacklist: Optional[list[str]] = None,
+                 total_conversion: Optional[bool] = None,
+                 whitelist: Optional[list[str]] = None
+                 ):
+        super().__init__()
+        self.name = name
+        self.author = author
+        self.version = version
+        self.description = description
+        self.compatibility = compatibility
+        self.priority = priority
+        self.source = source
+        self.blacklist = blacklist
+        self.total_conversion = total_conversion
+        self.whitelist = whitelist
+
+
 class RegistryPluginMetaDataModel:
     name: str
     author: Optional[str]

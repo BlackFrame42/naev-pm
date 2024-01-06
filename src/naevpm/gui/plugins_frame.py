@@ -1,7 +1,7 @@
 from tkinter import ttk, E, DISABLED, NORMAL, StringVar, Event, font
 
 from naevpm.core.config import Config
-from naevpm.core.models import plugin_fields, PluginDbModel, PluginState
+from naevpm.core.models import plugin_fields, PluginDbModel, PluginState, PluginMetaDataModel
 from naevpm.gui.abstract_gui_controller import AbstractGuiController
 from naevpm.gui.data_model_to_str_list import plugin_to_str_list
 from naevpm.gui.display_utils import field_name_as_list_header, display_boolean
@@ -14,10 +14,16 @@ class PluginsFrame(ttk.Frame):
     _plugins_list: SyncedTreeView[PluginDbModel]
 
     plugin_name_var: StringVar
+    plugin_author_var: StringVar
+    plugin_version_var: StringVar
+    plugin_description_var: StringVar
 
     def __init__(self, parent: ttk.Widget, root: TkRoot, gui_controller: AbstractGuiController, **kwargs):
         super().__init__(parent, **kwargs)
         self.plugin_name_var = StringVar()
+        self.plugin_author_var = StringVar()
+        self.plugin_version_var = StringVar()
+        self.plugin_description_var = StringVar()
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
@@ -42,6 +48,7 @@ class PluginsFrame(ttk.Frame):
         list_frame.grid(column=0, row=0, sticky='NSEW', **Config.GLOBAL_GRID_PADDING)
         list_frame.columnconfigure(0, weight=1)
         list_frame.columnconfigure(1, weight=1)
+        list_frame.columnconfigure(2, weight=1)
         list_frame.rowconfigure(0, weight=1)
 
         def get_object_identifier(r: PluginDbModel):
@@ -95,24 +102,48 @@ class PluginsFrame(ttk.Frame):
 
         self.list_item_context_menu = TreeviewContextMenu(self._plugins_list, root, configure_context_menu)
 
-        plugin_details_frame = ttk.Frame(content_frame, )
-
-        plugin_details_frame.grid(column=3, row=0, sticky='NES', **Config.GLOBAL_GRID_PADDING)
+        plugin_details_frame = ttk.Frame(content_frame, width=400, height=400)
+        plugin_details_frame.grid(column=2, row=0, sticky='NES', **Config.GLOBAL_GRID_PADDING)
+        # TODO understand grid propagate to set fix plugin details frame width..
+        # plugin_details_frame.grid_propagate(False)
         plugin_details_frame.columnconfigure(0, weight=1)
         # plugin_details_frame.rowconfigure(0, weight=1)
 
-        name_label = ttk.Label(plugin_details_frame, text="Name")
-        name_label.grid(column=0, row=0, sticky='NEW', **Config.GLOBAL_GRID_PADDING)
-
         bold_font = font.Font(weight="bold")
 
-        name_text = ttk.Label(plugin_details_frame, textvariable=self.plugin_name_var, font=bold_font)
-        name_text.grid(column=0, row=1, sticky='NEW', **Config.GLOBAL_GRID_PADDING)
+        name_label = ttk.Label(plugin_details_frame, text="Name")
+        name_label.grid(column=0, row=0, sticky='NEW')
+        name_text = ttk.Label(plugin_details_frame, textvariable=self.plugin_name_var, font=bold_font,
+                              wraplength=300)
+        name_text.grid(column=0, row=1, sticky='NEW')
+
+        author_label = ttk.Label(plugin_details_frame, text="Author(s)")
+        author_label.grid(column=0, row=2, sticky='NEW')
+        author_text = ttk.Label(plugin_details_frame, textvariable=self.plugin_author_var, font=bold_font,
+                                wraplength=300)
+        author_text.grid(column=0, row=3, sticky='NEW')
+
+        version_label = ttk.Label(plugin_details_frame, text="Version")
+        version_label.grid(column=0, row=4, sticky='NEW')
+        version_text = ttk.Label(plugin_details_frame, textvariable=self.plugin_version_var, font=bold_font,
+                                 wraplength=300)
+        version_text.grid(column=0, row=5, sticky='NEW')
+
+        description_label = ttk.Label(plugin_details_frame, text="Description")
+        description_label.grid(column=0, row=6, sticky='NEW')
+        description_text = ttk.Label(plugin_details_frame, textvariable=self.plugin_description_var, font=bold_font,
+                                     wraplength=300)
+        description_text.grid(column=0, row=7, sticky='NEW')
 
         def show_plugin_details(ev: Event):
             plugin = self._plugins_list.get_selected_object()
-            if plugin is not None:
-                self.plugin_name_var.set(plugin.name)
+            if plugin is not None and plugin.state in [PluginState.CACHED, PluginState.INSTALLED]:
+                gui_controller.show_plugin_details(plugin)
+            else:
+                self.plugin_name_var.set(' ' * 80)
+                self.plugin_author_var.set(' ' * 80)
+                self.plugin_version_var.set(' ' * 80)
+                self.plugin_description_var.set(' ' * 80)
 
         self._plugins_list.bind("<<TreeviewSelect>>", show_plugin_details)
 
@@ -183,3 +214,10 @@ class PluginsFrame(ttk.Frame):
 
     def remove_plugin(self, plugin: PluginDbModel):
         self._plugins_list.sync_remove(plugin)
+
+    def show_plugin_details(self, plugin: PluginDbModel, plugin_meta_data: PluginMetaDataModel):
+        if self._plugins_list.get_selected_object() is plugin:
+            self.plugin_name_var.set(plugin_meta_data.name)
+            self.plugin_author_var.set(plugin_meta_data.author)
+            self.plugin_version_var.set(plugin_meta_data.version)
+            self.plugin_description_var.set(plugin_meta_data.description)

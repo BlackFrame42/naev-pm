@@ -31,8 +31,13 @@ class SyncedTreeView(ttk.Treeview, Generic[T]):
 
     def sync_put_all(self, objects: list[T]):
         self.sync_clear()
+        first = True
         for obj in objects:
-            self.sync_put(obj)
+            iid = self.insert('', 'end', values=self._get_str_values_fn(obj))
+            self._sync.put(iid, obj)
+            if iid != '' and first:
+                self.selection_set(iid)
+                first = False
 
     def sync_clear(self):
         self._sync.clear()
@@ -69,6 +74,11 @@ class SyncedTreeView(ttk.Treeview, Generic[T]):
         if len(selected_iids) > 0:
             return self._sync.get_object_by_iid(selected_iids[0])
         return None
+
+    def get_selected_iid(self) -> str:
+        selected_iids = self.selection()
+        if len(selected_iids) > 0:
+            return selected_iids[0]
 
     def is_empty(self) -> bool:
         return self._sync.is_empty()

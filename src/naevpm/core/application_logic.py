@@ -12,7 +12,8 @@ from naevpm.core import git_utils
 from naevpm.core.abstract_thread_communication import AbstractCommunication
 from naevpm.core.config import Config
 from naevpm.core.directories import Directories
-from naevpm.core.models import PluginDbModel, RegistryDbModel, RegistryPluginMetaDataModel, PluginState
+from naevpm.core.models import PluginDbModel, RegistryDbModel, RegistryPluginMetaDataModel, PluginState, \
+    PluginMetaDataModel
 from naevpm.core.sqlite_database_connector import SqliteDatabaseConnector, RegistrySourceUniqueConstraintViolation
 
 
@@ -56,6 +57,10 @@ class ApplicationLogic:
         plugin_folder_name = self._get_folder_name_for_plugin(plugin)
         return os.path.join(Directories.PLUGINS_CACHE, plugin_folder_name)
 
+    def _get_absolute_cached_plugin_xml_path(self, plugin: PluginDbModel) -> str:
+        absolute_cached_plugin_folder_path = self._get_absolute_cached_plugin_folder_path2(plugin)
+        return os.path.join(absolute_cached_plugin_folder_path, 'plugin.xml')
+
     def _get_absolute_plugin_installation_folder_path(self, plugin_folder_name: str) -> str:
         return os.path.join(Directories.NAEV_PLUGIN_DIR, plugin_folder_name)
 
@@ -67,7 +72,10 @@ class ApplicationLogic:
                     xml_files.append(os.path.join(root, file))
         return xml_files
 
-    def _parse_plugin_xml_file(self, file_path: str) -> RegistryPluginMetaDataModel:
+    def _parse_registry_plugin_metadata_xml_file(self, file_path: str) -> RegistryPluginMetaDataModel:
+        """
+        Specification at https://github.com/naev/naev-plugins#plugin-information-format
+        """
         with open(file_path, 'r') as f:
             text_content = f.read()
             plugin = etree.XML(text_content.encode('utf-8'))
@@ -79,6 +87,27 @@ class ApplicationLogic:
                 website=plugin.findtext("website")
             )
 
+    def parse_plugin_metadata_xml_file(self, plugin: PluginDbModel) -> PluginMetaDataModel:
+        file_path = self._get_absolute_cached_plugin_xml_path(plugin)
+        """
+        Specification at https://github.com/naev/naev/blob/main/docs/manual/sec/plugins.md#plugin-meta-data-pluginxml
+        """
+        with open(file_path, 'r') as f:
+            text_content = f.read()
+            plugin = etree.XML(text_content.encode('utf-8'))
+            return PluginMetaDataModel(
+                name=plugin.get("name"),
+                author=plugin.findtext("author"),
+                version=plugin.findtext("version"),
+                description=plugin.findtext("description"),
+                compatibility=plugin.findtext("compatibility"),
+                priority=int(plugin.findtext("priority")),
+                source=plugin.findtext("source"),
+                blacklist=plugin.xpath(f'./blacklist/text()'),
+                total_conversion=len(plugin.xpath(f'./total_conversion')) > 0,
+                whitelist=plugin.xpath(f'./whitelist/text()')
+            )
+
     def _read_cached_registry(self, absolute_registry_folder_path: str) -> list[RegistryPluginMetaDataModel]:
         """
         @param absolute_registry_folder_path:
@@ -87,7 +116,7 @@ class ApplicationLogic:
         plugin_metadatas = []
         plugin_xml_dir = os.path.join(absolute_registry_folder_path, Config.PLUGIN_XML_DIR)
         for absolute_xml_file_path in self._all_plugin_metadata_file_paths(plugin_xml_dir):
-            plugin_metadata = self._parse_plugin_xml_file(absolute_xml_file_path)
+            plugin_metadata = self._parse_registry_plugin_metadata_xml_file(absolute_xml_file_path)
             plugin_metadatas.append(plugin_metadata)
         return plugin_metadatas
 

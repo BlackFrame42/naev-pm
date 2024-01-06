@@ -4,7 +4,7 @@ from typing import Optional, Any
 
 from naevpm.core.application_logic import ApplicationLogic, ApplicationLogicRegistrySourceWasAlreadyAdded, \
     ApplicationLogicEmptyRegistrySource
-from naevpm.core.models import PluginDbModel, RegistryDbModel, PluginState
+from naevpm.core.models import PluginDbModel, RegistryDbModel, PluginState, PluginMetaDataModel
 
 from naevpm.core.sqlite_database_connector import SqliteDatabaseConnector
 from naevpm.gui.abstract_gui_controller import AbstractGuiController
@@ -193,6 +193,7 @@ class GuiController(AbstractGuiController):
                 self.show_status(f'Unhandled error occurred: {str(e)}')
                 raise e
             self.plugins_frame.update_plugin(plugin)
+            self.show_plugin_details(plugin)
 
         self.tk_threading.run_threaded_task('fetch_plugin', task, callback)
 
@@ -211,3 +212,17 @@ class GuiController(AbstractGuiController):
 
     def show_status(self, value: str):
         self.status_text.set(value)
+
+    def show_plugin_details(self, plugin: PluginDbModel):
+        def task(tc: ThreadCommunication):
+            plugin_meta_data = self.application_logic.parse_plugin_metadata_xml_file(plugin)
+            return plugin_meta_data
+
+        def callback(plugin_meta_data: PluginMetaDataModel, e: Optional[Exception] = None):
+            # Reraise in GUI thread if not handled
+            if e is not None:
+                self.show_status(f'Unhandled error occurred: {str(e)}')
+                raise e
+            self.plugins_frame.show_plugin_details(plugin, plugin_meta_data)
+
+        self.tk_threading.run_threaded_task('remove_plugin_from_index', task, callback)

@@ -39,11 +39,11 @@ class AbstractGuiController:
     def show_status(self, value: str):
         pass
 
-    def start_task(self):
+    def remove_plugin_from_index(self, plugin: PluginDbModel):
         pass
 
-    def remove_plugin_from_index(self, plugin):
+    def fetch_plugin(self, plugin: PluginDbModel):
         pass
 
-    def fetch_plugin(self, plugin):
+    def show_plugin_details(self, plugin: PluginDbModel):
         pass
