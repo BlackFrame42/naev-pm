@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin name="Test Plugin">
+  <author>Test Author</author>
+  <version>0.1</version>
+  <description>Test descritpion test description</description>
+  <compatibility>woeifj weoifj </compatibility>
+  <priority>2</priority>
+  <source>temp/test-resources/git-plugin-test</source>
+  <blacklist>asdf</blacklist>
+  <blacklist>asdf2</blacklist>
+  <whitelist>weoine</whitelist>
+  <whitelist>weoine2</whitelist>
+  <total_conversion />
+</plugin>
