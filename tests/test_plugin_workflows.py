@@ -289,6 +289,19 @@ class TestPluginWorkflows(unittest.TestCase):
         config = TestConfig()
 
         shutil.copytree('tests/test-resources/git-plugin-test', 'temp/git-plugin-test')
+        pygit2.init_repository('temp/git-plugin-test')
+        repo = pygit2.Repository('temp/git-plugin-test/')
+        index = repo.index
+        index.add('plugin.xml')
+        index.add('test.txt')
+        index.write()
+        ref = "HEAD"
+        author = pygit2.Signature('test', 'dummy@mail.address')
+        committer = pygit2.Signature('test', 'dummy@mail.address')
+        message = "Add all"
+        tree = index.write_tree()
+        parents = []
+        repo.create_commit(ref, author, committer, message, tree, parents)
 
         database_connector = SqliteDatabaseConnector(config.DATABASE)
         plugin_workflow_manager = PluginWorkflowManager(database_connector, config)
