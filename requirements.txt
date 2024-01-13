@@ -2,7 +2,7 @@ pygit2
 lxml
 appdirs
 Pillow
-
+requests
 # install tkinter with your system distribution's package manager
 
 # CLI:

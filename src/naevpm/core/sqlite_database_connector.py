@@ -1,12 +1,13 @@
+import json
 import logging
 import sqlite3
 from datetime import datetime, timezone
 from sqlite3 import Connection, IntegrityError, Cursor
 from typing import Optional
 
-from naevpm.core.models import PluginDbModel, RegistryDbModel, RegistryPluginMetaDataModel, registry_fields, \
-    plugin_fields, \
-    PluginState
+from naevpm.core.models import IndexedPluginDbModel, RegistryDbModel, RegistryPluginMetaDataModel, registry_fields, \
+    indexed_plugin_fields, \
+    PluginState, PluginMetadataDbModel, plugin_metadata_fields
 
 logger = logging.getLogger(__name__)
 if sqlite3.threadsafety != 3:
@@ -29,12 +30,22 @@ def dict_factory(cursor: Cursor, row):
     return {key: value for key, value in zip(fields, row)}
 
 
-def plugin_factory(cursor: Cursor, row):
+def indexed_plugin_factory(cursor: Cursor, row):
     obj = dict_factory(cursor, row)
     state = obj['state']
     if state is not None:
         obj['state'] = PluginState[obj['state']]
-    return PluginDbModel(**obj)
+
+    return IndexedPluginDbModel(**obj)
+
+
+def plugin_metadata_factory(cursor: Cursor, row):
+    obj = dict_factory(cursor, row)
+    if obj['blacklist'] is not None:
+        obj['blacklist'] = json.loads(obj['blacklist'])
+    if obj['whitelist'] is not None:
+        obj['whitelist'] = json.loads(obj['whitelist'])
+    return PluginMetadataDbModel(**obj)
 
 
 def registry_factory(cursor: Cursor, row):
@@ -52,7 +63,7 @@ class SqliteDatabaseConnector:
         source                 text primary key,
         last_fetched           text
     );
-    CREATE TABLE IF NOT EXISTS plugin (
+    CREATE TABLE IF NOT EXISTS indexed_plugin (
         name                 text,
         author               text,
         license              text,
@@ -63,8 +74,21 @@ class SqliteDatabaseConnector:
         update_available    bool,
         registry_source              text ,
         state               text,
+        source_type         text,
         FOREIGN KEY(registry_source) REFERENCES registry(source) ON DELETE SET NULL
     );
+    CREATE TABLE IF NOT EXISTS plugin_metadata (
+            name text,
+            author text,
+            version text,
+            description text,
+            compatibility text,
+            priority integer,
+            source text primary key,
+            blacklist JSON,
+            total_conversion bool,
+            whitelist JSON
+    )
     """
     db: Connection
 
@@ -118,60 +142,60 @@ class SqliteDatabaseConnector:
         ])
         self.db.commit()
 
-    def index_plugin(self, registry_source: str, plugin_meta_data: RegistryPluginMetaDataModel):
+    def index_plugin(self, registry_source: str, registry_plugin_meta_data: RegistryPluginMetaDataModel):
         """
-        Used to update plugin list from registry index. Overwrites only fields provided by the index.
+        Used to UPDATE indexed_plugin list from registry index. Overwrites only fields provided by the index.
         """
         db_plugin = self.db.execute(
-            """SELECT * FROM plugin WHERE source = ?""",
-            [plugin_meta_data.source]).fetchone()
+            """SELECT * FROM indexed_plugin WHERE source = ?""",
+            [registry_plugin_meta_data.source]).fetchone()
         if db_plugin is None:
             self.db.execute("""
-                INSERT INTO plugin (name, author, license, website,
+                INSERT INTO indexed_plugin (name, author, license, website,
                                     source, registry_source, state)
                 VALUES             (?,?,?,?,?,?,?);
                 """,
                             [
-                                plugin_meta_data.name,
-                                plugin_meta_data.author,
-                                plugin_meta_data.license,
-                                plugin_meta_data.website,
-                                plugin_meta_data.source,
+                                registry_plugin_meta_data.name,
+                                registry_plugin_meta_data.author,
+                                registry_plugin_meta_data.license,
+                                registry_plugin_meta_data.website,
+                                registry_plugin_meta_data.source,
                                 registry_source,
                                 PluginState.INDEXED.name
                             ]
                             )
         else:
             self.db.execute("""
-                UPDATE plugin SET author=?, license=?, website=?,
+                UPDATE indexed_plugin SET author=?, license=?, website=?,
                                     name=?, registry_source=? WHERE source=?;
                 """,
                             [
-                                plugin_meta_data.author,
-                                plugin_meta_data.license,
-                                plugin_meta_data.website,
-                                plugin_meta_data.name,
+                                registry_plugin_meta_data.author,
+                                registry_plugin_meta_data.license,
+                                registry_plugin_meta_data.website,
+                                registry_plugin_meta_data.name,
                                 registry_source,
 
-                                plugin_meta_data.source
+                                registry_plugin_meta_data.source
                             ]
                             )
         self.db.commit()
 
-    def get_plugins(self) -> list[PluginDbModel]:
+    def get_plugins(self) -> list[IndexedPluginDbModel]:
         cur = self.db.cursor()
-        cur.row_factory = plugin_factory
-        return cur.execute(f"SELECT {','.join(plugin_fields)} FROM plugin ORDER BY name, source;").fetchall()
+        cur.row_factory = indexed_plugin_factory
+        return cur.execute(f"SELECT {','.join(indexed_plugin_fields)} FROM indexed_plugin ORDER BY name, source;").fetchall()
 
-    def get_plugin(self, source: str) -> Optional[PluginDbModel]:
+    def get_plugin(self, source: str) -> Optional[IndexedPluginDbModel]:
         cur = self.db.cursor()
-        cur.row_factory = plugin_factory
+        cur.row_factory = indexed_plugin_factory
         return cur.execute(
-            f"SELECT {','.join(plugin_fields)} FROM plugin WHERE source = ?", [source]
+            f"SELECT {','.join(indexed_plugin_fields)} FROM indexed_plugin WHERE source = ?", [source]
         ).fetchone()
 
     def exists_plugin(self, source: str) -> bool:
-        return self.db.execute('SELECT EXISTS(SELECT 1 FROM plugin WHERE source=? LIMIT 1);',
+        return self.db.execute('SELECT EXISTS(SELECT 1 FROM indexed_plugin WHERE source=? LIMIT 1);',
                                [source]).fetchone()[0]
 
     def exists_registry(self, source: str) -> bool:
@@ -179,19 +203,46 @@ class SqliteDatabaseConnector:
                                [source]).fetchone()[0]
 
     def remove_plugin(self, source: str) -> None:
-        self.db.execute("DELETE FROM plugin WHERE source = ?", [source])
+        self.db.execute("DELETE FROM indexed_plugin WHERE source = ?", [source])
         self.db.commit()
 
     def set_plugin_state(self, source: str, state: PluginState):
-        self.db.execute("""UPDATE plugin SET state = ? WHERE source = ?""", [
+        self.db.execute("""UPDATE indexed_plugin SET state = ? WHERE source = ?""", [
             state.name,
             source
         ])
         self.db.commit()
 
     def set_plugin_update_available(self, source: str, update_available: bool):
-        self.db.execute("""UPDATE plugin SET update_available = ? WHERE source = ?""", [
+        self.db.execute("""UPDATE indexed_plugin SET update_available = ? WHERE source = ?""", [
             update_available,
             source
         ])
         self.db.commit()
+
+    def get_plugin_metadata(self, source: str) -> Optional[PluginMetadataDbModel]:
+        cur = self.db.cursor()
+        cur.row_factory = plugin_metadata_factory
+        return cur.execute(
+            f"SELECT {','.join(plugin_metadata_fields)} FROM plugin_metadata WHERE source = ?", [source]
+        ).fetchone()
+
+    def insert_plugin_metadata(self, plugin_meta_data: PluginMetadataDbModel):
+        self.db.execute("""
+            INSERT INTO plugin_metadata (name, author, version, description, compatibility, 
+                    priority, source, blacklist, total_conversion, whitelist)
+            VALUES             (?,?,?,?,?,?,?,?,?,?);
+            """,
+                        [
+                            plugin_meta_data.name,
+                            plugin_meta_data.author,
+                            plugin_meta_data.version,
+                            plugin_meta_data.description,
+                            plugin_meta_data.compatibility,
+                            plugin_meta_data.priority,
+                            plugin_meta_data.source,
+                            json.dumps(plugin_meta_data.blacklist),
+                            plugin_meta_data.total_conversion,
+                            json.dumps(plugin_meta_data.whitelist)
+                        ]
+                        )

@@ -4,7 +4,7 @@ import logging
 from PIL import ImageTk, Image
 
 from naevpm.core.application_logic import ApplicationLogic
-from naevpm.core.directories import Directories
+from naevpm.core.config import Config
 from naevpm.core.sqlite_database_connector import SqliteDatabaseConnector
 from naevpm.gui.gui_controller import GuiController
 from naevpm.gui.naevpm_frame import NaevPmFrame
@@ -12,16 +12,16 @@ from naevpm.gui.tk_root import TkRoot
 from naevpm.gui.tk_threading import TkThreading
 
 
-def start_gui():
+def start_gui(config: Config):
     # Use the system locale
     locale.setlocale(locale.LC_ALL, '')
     logging.basicConfig(level=logging.INFO)
     # TODO logging configuration file
     root = TkRoot(title='Naev Plugin Manager')
 
-    database_connector = SqliteDatabaseConnector(Directories.DATABASE)
+    database_connector = SqliteDatabaseConnector(config.DATABASE)
 
-    application_logic = ApplicationLogic(database_connector)
+    application_logic = ApplicationLogic(database_connector, config)
     tk_threading = TkThreading(root)
     gui_controller = GuiController(database_connector, root, tk_threading, application_logic)
     tk_threading.set_update_gui_fn(gui_controller.show_status)
@@ -44,6 +44,7 @@ def start_gui():
 
     gui_controller.registries_frame = naevpm_frame.registries_frame
     gui_controller.plugins_frame = naevpm_frame.plugins_frame
+    gui_controller.naevpm_frame = naevpm_frame
 
     gui_controller.refresh_registries_list()
     gui_controller.refresh_plugins_list()
@@ -52,8 +53,9 @@ def start_gui():
     root.update()
     root.geometry(root.geometry())
 
+    gui_controller.show_status('Application started. Welcome.')
     root.mainloop()
 
 
 if __name__ == '__main__':
-    start_gui()
+    start_gui(Config())

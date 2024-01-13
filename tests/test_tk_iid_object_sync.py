@@ -1,19 +1,19 @@
 import unittest
 
-from naevpm.core.models import PluginDbModel, PluginState
+from naevpm.core.models import IndexedPluginDbModel, PluginState
 from naevpm.gui.tk_iid_object_sync import TkIidObjSync
 
 
 class TestTkItemIdentifierObjectSync(unittest.TestCase):
 
-    def test_upper(self):
-        def get_obj_identifier(obj: PluginDbModel):
+    def test_sync(self):
+        def get_obj_identifier(obj: IndexedPluginDbModel):
             return obj.source
 
         sync = TkIidObjSync(get_obj_identifier)
-        obj1 = PluginDbModel('name1', 'source1', PluginState.INDEXED)
-        obj2 = PluginDbModel('name2', 'source2', PluginState.INDEXED)
-        obj3 = PluginDbModel('name3', 'source3', PluginState.INDEXED)
+        obj1 = IndexedPluginDbModel('name1', 'source1', PluginState.INDEXED)
+        obj2 = IndexedPluginDbModel('name2', 'source2', PluginState.INDEXED)
+        obj3 = IndexedPluginDbModel('name3', 'source3', PluginState.INDEXED)
         sync.put('id1', obj1)
         sync.put('id2', obj2)
         sync.put('id3', obj3)

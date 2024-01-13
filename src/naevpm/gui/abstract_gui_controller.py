@@ -1,4 +1,4 @@
-from naevpm.core.models import PluginDbModel, RegistryDbModel
+from naevpm.core.models import IndexedPluginDbModel, RegistryDbModel
 
 
 class AbstractGuiController:
@@ -18,34 +18,34 @@ class AbstractGuiController:
     def refresh_plugins_list(self):
         pass
 
-    def install_plugin_from_cache(self, plugin: PluginDbModel):
+    def install_plugin(self, plugin: IndexedPluginDbModel):
         pass
 
-    def uninstall_plugin(self, plugin: PluginDbModel):
+    def uninstall_plugin(self, plugin: IndexedPluginDbModel):
         pass
 
-    def delete_plugin_from_cache(self, plugin: PluginDbModel):
+    def delete_plugin(self, plugin: IndexedPluginDbModel):
         pass
 
-    def check_for_plugin_update(self, plugin: PluginDbModel):
+    def check_plugin(self, plugin: IndexedPluginDbModel):
         pass
 
-    def update_plugin(self, plugin: PluginDbModel):
+    def update_plugin(self, plugin: IndexedPluginDbModel):
         pass
 
-    def check_for_plugin_updates(self, plugins: list[PluginDbModel]):
+    def check_for_plugin_updates(self, plugins: list[IndexedPluginDbModel]):
         pass
 
     def show_status(self, value: str):
         pass
 
-    def remove_plugin_from_index(self, plugin: PluginDbModel):
+    def remove_plugin(self, plugin: IndexedPluginDbModel):
         pass
 
-    def fetch_plugin(self, plugin: PluginDbModel):
+    def fetch_plugin(self, plugin: IndexedPluginDbModel):
         pass
 
-    def show_plugin_details(self, plugin: PluginDbModel):
+    def show_plugin_details(self, plugin: IndexedPluginDbModel):
         pass
 
     def import_existing_plugins_to_index(self):

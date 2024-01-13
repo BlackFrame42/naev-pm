@@ -55,7 +55,17 @@ It creates the cli commands 'naevpm' and 'naevpm-gui'.
       uninstall
       update
 
-# Example screenshots
+## Example screenshots
 
 ![GUI Screen Shots](Screenshot%20from%202024-01-07%2000-22-56.png "GUI Screen Shots")
 ![GUI Screen Shots](Screenshot%20from%202024-01-07%2000-23-03.png "GUI Screen Shots")
+
+## Tests
+
+    (venv)[naev-pm]$ python -m unittest discover -s tests/
+
+## Coverage
+
+    (venv)[naev-pm]$ coverage run -m unittest discover -s tests/
+    (venv)[naev-pm]$ coverage report -m 
+    (venv)[naev-pm]$ coverage html

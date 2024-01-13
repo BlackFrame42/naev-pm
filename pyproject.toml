@@ -17,7 +17,8 @@ dependencies = [
     "appdirs",
     "Pillow",
     "click",
-    "tabulate"
+    "tabulate",
+    "requests"
 ]
 license = "MIT"
 

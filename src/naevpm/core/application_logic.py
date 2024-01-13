@@ -1,20 +1,19 @@
 import base64
 import os
 import shutil
+import zipfile
 from datetime import datetime, timezone
 from hashlib import md5
 from typing import Optional
-import pygit2
 from lxml import etree
 from urllib.parse import quote
 
 from naevpm.core import git_utils
 from naevpm.core.abstract_thread_communication import AbstractCommunication
 from naevpm.core.config import Config
-from naevpm.core.directories import Directories
-from naevpm.core.git_utils import OriginNotFound
-from naevpm.core.models import PluginDbModel, RegistryDbModel, RegistryPluginMetaDataModel, PluginState, \
-    PluginMetaDataModel
+from naevpm.core.models import IndexedPluginDbModel, RegistryDbModel, RegistryPluginMetaDataModel, \
+    PluginMetadataDbModel
+from naevpm.core.plugin_workflows.plugin_workflow_manager import PluginWorkflowManager
 from naevpm.core.sqlite_database_connector import SqliteDatabaseConnector, RegistrySourceUniqueConstraintViolation
 
 
@@ -28,10 +27,14 @@ class ApplicationLogicEmptyRegistrySource(Exception):
 
 class ApplicationLogic:
     database_connector: SqliteDatabaseConnector
+    plugin_workflow_manager: PluginWorkflowManager
+    config: Config
 
-    def __init__(self, database_connector: SqliteDatabaseConnector):
+    def __init__(self, database_connector: SqliteDatabaseConnector, config: Config):
         super().__init__()
+        self.config = config
         self.database_connector = database_connector
+        self.plugin_workflow_manager = PluginWorkflowManager(database_connector, config)
 
     def _get_folder_name_for_registry(self, source: str) -> str:
         # Still add some part of the source to the name, so that it can be recognized in the file browser by a human
@@ -44,29 +47,26 @@ class ApplicationLogic:
         return base64.urlsafe_b64encode(md5(source.encode('utf-8')).digest()).decode(
             'utf-8') + '_' + encoded_name
 
-    def _get_folder_name_for_plugin(self, plugin: PluginDbModel) -> str:
+    def _get_folder_name_for_plugin(self, plugin: IndexedPluginDbModel) -> str:
         return self._get_folder_name_for_plugin_name_and_source(plugin.name, plugin.source)
 
     def _get_absolute_registry_folder_path(self, registry_folder_name: str) -> str:
-        return os.path.join(Directories.REGISTRIES, registry_folder_name)
+        return os.path.join(self.config.REGISTRIES, registry_folder_name)
 
     def _get_absolute_registry_folder_path2(self, registry: RegistryDbModel):
         registry_folder_name = self._get_folder_name_for_registry(registry.source)
         return self._get_absolute_registry_folder_path(registry_folder_name)
 
     def _get_absolute_cached_plugin_folder_path(self, plugin_folder_name: str) -> str:
-        return os.path.join(Directories.PLUGINS_CACHE, plugin_folder_name)
+        return os.path.join(self.config.PLUGINS_CACHE, plugin_folder_name)
 
-    def _get_absolute_cached_plugin_folder_path2(self, plugin: PluginDbModel) -> str:
+    def _get_absolute_cached_plugin_folder_path2(self, plugin: IndexedPluginDbModel) -> str:
         plugin_folder_name = self._get_folder_name_for_plugin(plugin)
-        return os.path.join(Directories.PLUGINS_CACHE, plugin_folder_name)
+        return os.path.join(self.config.PLUGINS_CACHE, plugin_folder_name)
 
-    def _get_absolute_cached_plugin_xml_path(self, plugin: PluginDbModel) -> str:
+    def _get_absolute_cached_plugin_xml_path(self, plugin: IndexedPluginDbModel) -> str:
         absolute_cached_plugin_folder_path = self._get_absolute_cached_plugin_folder_path2(plugin)
         return os.path.join(absolute_cached_plugin_folder_path, 'plugin.xml')
-
-    def _get_absolute_plugin_installation_folder_path(self, plugin_folder_name: str) -> str:
-        return os.path.join(Directories.NAEV_PLUGIN_DIR, plugin_folder_name)
 
     def _all_plugin_metadata_file_paths(self, folder: str) -> list[str]:
         xml_files = []
@@ -92,33 +92,49 @@ class ApplicationLogic:
                 website=plugin.findtext("website")
             )
 
-    def _parse_plugin_metadata_xml_file(self, xml_path: str) -> PluginMetaDataModel:
+    def _parse_plugin_metadata_xml_string(self, xml_string: str):
+        plugin = etree.XML(xml_string.encode('utf-8'))
+        priority = plugin.findtext("priority")
+        priority_int = None
+        if priority is not None:
+            priority_int = int(priority)
+        return PluginMetadataDbModel(
+            name=plugin.get("name"),
+            author=plugin.findtext("author"),
+            version=plugin.findtext("version"),
+            description=plugin.findtext("description"),
+            compatibility=plugin.findtext("compatibility"),
+            priority=priority_int,
+            source=plugin.findtext("source"),
+            blacklist=plugin.xpath(f'./blacklist/text()'),
+            total_conversion=len(plugin.xpath(f'./total_conversion')) > 0,
+            whitelist=plugin.xpath(f'./whitelist/text()')
+        )
+
+    def _parse_plugin_metadata_xml_file(self, xml_path: str) -> PluginMetadataDbModel:
         """
-              Specification at https://github.com/naev/naev/blob/main/docs/manual/sec/plugins.md#plugin-meta-data-pluginxml
-              """
+        Specification at https://github.com/naev/naev/blob/main/docs/manual/sec/plugins.md#plugin-meta-data-pluginxml
+        """
         with open(xml_path, 'r') as f:
             text_content = f.read()
-            plugin = etree.XML(text_content.encode('utf-8'))
-            priority = plugin.findtext("priority")
-            priority_int = None
-            if priority is not None:
-                priority_int = int(priority)
-            return PluginMetaDataModel(
-                name=plugin.get("name"),
-                author=plugin.findtext("author"),
-                version=plugin.findtext("version"),
-                description=plugin.findtext("description"),
-                compatibility=plugin.findtext("compatibility"),
-                priority=priority_int,
-                source=plugin.findtext("source"),
-                blacklist=plugin.xpath(f'./blacklist/text()'),
-                total_conversion=len(plugin.xpath(f'./total_conversion')) > 0,
-                whitelist=plugin.xpath(f'./whitelist/text()')
-            )
+            return self._parse_plugin_metadata_xml_string(text_content)
 
-    def parse_plugin_metadata_xml_file(self, plugin: PluginDbModel) -> PluginMetaDataModel:
-        file_path = self._get_absolute_cached_plugin_xml_path(plugin)
-        return self._parse_plugin_metadata_xml_file(file_path)
+    def parse_plugin_metadata_xml_file(self, plugin: IndexedPluginDbModel) -> Optional[PluginMetadataDbModel]:
+        if plugin.source.endswith('.zip'):
+            cache_location, install_location = self.plugin_workflow_manager.get_locations(plugin)
+            with zipfile.ZipFile(cache_location) as z:
+                fd = None
+                try:
+                    fd = z.open('plugin.xml', 'r')
+                    return self._parse_plugin_metadata_xml_string(fd.read().decode('utf-8'))
+                except KeyError:
+                    return None
+                finally:
+                    if fd is not None:
+                        fd.close()
+        else:
+            file_path = self._get_absolute_cached_plugin_xml_path(plugin)
+            return self._parse_plugin_metadata_xml_file(file_path)
 
     def _read_cached_registry(self, absolute_registry_folder_path: str) -> list[RegistryPluginMetaDataModel]:
         """
@@ -126,7 +142,7 @@ class ApplicationLogic:
         @return: All plugin metadata found in plugins folder of registry.
         """
         plugin_metadatas = []
-        plugin_xml_dir = os.path.join(absolute_registry_folder_path, Config.PLUGIN_XML_DIR)
+        plugin_xml_dir = os.path.join(absolute_registry_folder_path, self.config.PLUGIN_XML_DIR)
         for absolute_xml_file_path in self._all_plugin_metadata_file_paths(plugin_xml_dir):
             plugin_metadata = self._parse_registry_plugin_metadata_xml_file(absolute_xml_file_path)
             plugin_metadatas.append(plugin_metadata)
@@ -151,7 +167,7 @@ class ApplicationLogic:
     # ----------------------------------NEW
     def _sync_repo(self, source: str, target: str, tc: AbstractCommunication):
         tc.message(f"Syncing: {source} -> {target}")
-        git_utils.sync_repo(source, target, Config.DEFAULT_GIT_REMOTE_NAME, Config.REGISTRY_GIT_BRANCH_NAME)
+        git_utils.sync_repo(source, target, self.config.DEFAULT_GIT_REMOTE_NAME, self.config.REGISTRY_GIT_BRANCH_NAME)
         tc.message(f"Synced: {source} -> {target}")
 
     def _hard_link(self, source: str, target: str, tc: AbstractCommunication):
@@ -186,40 +202,11 @@ class ApplicationLogic:
         registry.last_fetched = datetime.now(tz=timezone.utc)
         tc.message(f"Saved: Registry field last_fetched '{str(last_fetched)}' for registry {registry.source}")
 
-    def _delete_folder_recursively(self, path: str, tc: AbstractCommunication):
-        tc.message(f"Deleting: Path {path}")
-        if os.path.exists(path):
-            shutil.rmtree(path)
-        tc.message(f"Deleted: Path {path}")
-
-    def _save_plugin_state(self, plugin: PluginDbModel, state: PluginState, tc: AbstractCommunication):
-        tc.message(f"Saving: State '{state.name}' for plugin {plugin.source}")
-        self.database_connector.set_plugin_state(plugin.source, state)
-        plugin.state = state
-        tc.message(f"Saved: State '{state.name}' for plugin {plugin.source}")
-
-    def _fetch_latest_commit(self, repo: pygit2.Repository, tc: AbstractCommunication):
-        tc.message(f"Fetching: Latest commit for repo {repo.path}")
-        git_utils.fetch_latest_commit(
-            repo,
-            Config.DEFAULT_GIT_REMOTE_NAME)
-        tc.message(f"Fetched: Latest commit for repo {repo.path}")
-
-    def _save_plugin_update_available(self, plugin: PluginDbModel, update_available: bool, tc: AbstractCommunication):
-        tc.message(f"Saving: Plugin field update_available '{str(update_available)}' for plugin {plugin.source}")
-        self.database_connector.set_plugin_update_available(plugin.source, update_available)
-        plugin.update_available = update_available
-        tc.message(f"Saved: Plugin field update_available '{str(update_available)}' for plugin {plugin.source}")
-
-    def _is_remote_and_local_commit_same(self, repo: pygit2.Repository):
-        return git_utils.is_remote_and_local_commit_same(repo, Config.DEFAULT_GIT_REMOTE_NAME,
-                                                         Config.DEFAULT_GIT_BRANCH_NAME)
-
     def fetch_registry_plugin_metadatas(self, registry: RegistryDbModel, tc: AbstractCommunication):
         tc.message(f"Fetching: Plugin meta from {registry.source}")
-        if registry.source == Directories.LOCAL_REGISTRY:
+        if registry.source == self.config.LOCAL_REGISTRY:
             # Skip fetch from git remote as there is none for local registry
-            plugin_metadatas = self._read_plugin_metadatas(Directories.LOCAL_REGISTRY, tc)
+            plugin_metadatas = self._read_plugin_metadatas(self.config.LOCAL_REGISTRY, tc)
         else:
             absolute_registry_folder_path = self._get_absolute_registry_folder_path2(registry)
             # Make sure the registry repo is uptodate
@@ -232,87 +219,6 @@ class ApplicationLogic:
         self._save_registry_last_fetched(registry, tc)
         tc.message(f"Fetched: Plugin meta data from {registry.source}")
 
-    def remove_plugin_from_index(self, plugin: PluginDbModel, tc: AbstractCommunication):
-        assert plugin.state == PluginState.INDEXED
-        tc.message(f"Removing: Plugin {plugin.source} from index")
-        self.database_connector.remove_plugin(plugin.source)
-        tc.message(f"Removed: Plugin {plugin.source} from index")
-
-    def fetch_plugin(self, plugin: PluginDbModel, tc: AbstractCommunication):
-        assert plugin.state == PluginState.INDEXED
-        tc.message(f"Fetching: Plugin from {plugin.source}")
-        absolute_cached_plugin_folder_path = self._get_absolute_cached_plugin_folder_path2(plugin)
-        self._sync_repo(plugin.source, absolute_cached_plugin_folder_path, tc)
-        self._save_plugin_state(plugin, PluginState.CACHED, tc)
-        tc.message(f"Fetched: Plugin from {plugin.source}")
-
-    def delete_plugin_from_cache(self, plugin: PluginDbModel, tc: AbstractCommunication):
-        assert plugin.state == PluginState.CACHED
-        tc.message(f"Deleting: Plugin {plugin.source} from cache")
-        absolute_cached_plugin_folder_path = self._get_absolute_cached_plugin_folder_path2(plugin)
-        self._delete_folder_recursively(absolute_cached_plugin_folder_path, tc)
-        self._save_plugin_state(plugin, PluginState.INDEXED, tc)
-        tc.message(f"Deleted: Plugin {plugin.source} from cache")
-
-    def install_plugin_from_cache(self, plugin: PluginDbModel, tc: AbstractCommunication):
-        assert plugin.state == PluginState.CACHED
-        tc.message(f"Installing: Plugin {plugin.source} from cache")
-        plugin_folder_name = self._get_folder_name_for_plugin(plugin)
-        absolute_cached_plugin_folder_path = self._get_absolute_cached_plugin_folder_path(plugin_folder_name)
-        absolute_plugin_installation_folder_path = (
-            self._get_absolute_plugin_installation_folder_path(plugin_folder_name))
-        # Create hard links for the whole tree. Using hard links instead of a symbolic links
-        # has the advantage of not producing broken links if the linked files are deleted, e.g. when the cache is
-        # cleared.
-        self._hard_link(absolute_cached_plugin_folder_path, absolute_plugin_installation_folder_path, tc)
-        self._save_plugin_state(plugin, PluginState.INSTALLED, tc)
-        tc.message(f"Installed: Plugin {plugin.source} from cache at {absolute_plugin_installation_folder_path}")
-
-    def uninstall_plugin(self, plugin: PluginDbModel, tc: AbstractCommunication):
-        assert plugin.state == PluginState.INSTALLED
-        tc.message(f"Uninstalling: Plugin {plugin.source}")
-        plugin_folder_name = self._get_folder_name_for_plugin(plugin)
-        absolute_plugin_installation_folder_path = (
-            self._get_absolute_plugin_installation_folder_path(plugin_folder_name))
-        self._delete_folder_recursively(absolute_plugin_installation_folder_path, tc)
-        self._save_plugin_state(plugin, PluginState.CACHED, tc)
-        tc.message(f"Uninstalled: Plugin {plugin.source} from {absolute_plugin_installation_folder_path}")
-
-    def check_for_plugin_update(self, plugin: PluginDbModel, tc: AbstractCommunication):
-        assert plugin.state == PluginState.INSTALLED
-        tc.message(f"Checking for updates: Plugin {plugin.source}")
-        plugin_folder_name = self._get_folder_name_for_plugin(plugin)
-        absolute_cached_plugin_folder_path = self._get_absolute_cached_plugin_folder_path(plugin_folder_name)
-        cached_plugin_repo = pygit2.Repository(absolute_cached_plugin_folder_path)
-        try:
-            self._fetch_latest_commit(cached_plugin_repo, tc)
-            # Check if fetched remote branch has another (newer) commit:
-            if not self._is_remote_and_local_commit_same(cached_plugin_repo):
-                self._save_plugin_update_available(plugin, True, tc)
-            tc.message(f"Checked for updates: Plugin {plugin.source}")
-        except OriginNotFound:
-            tc.message(f"Check for updates failed. Plugin {plugin.source} does not have any remote repo.")
-
-    def update_plugin(self, plugin: PluginDbModel, tc: AbstractCommunication):
-        assert plugin.state == PluginState.INSTALLED
-        tc.message(f"Updating: Plugin {plugin.source}")
-        plugin_folder_name = self._get_folder_name_for_plugin(plugin)
-        absolute_cached_plugin_folder_path = self._get_absolute_cached_plugin_folder_path(plugin_folder_name)
-        # Update cache
-        self._sync_repo(plugin.source, absolute_cached_plugin_folder_path, tc)
-        # Apply update by deleting installation folder and hard-linking it again to the cache
-        absolute_plugin_installation_folder_path = (
-            self._get_absolute_plugin_installation_folder_path(plugin_folder_name))
-        self._delete_folder_recursively(absolute_plugin_installation_folder_path, tc)
-        self._hard_link(
-            absolute_cached_plugin_folder_path,
-            absolute_plugin_installation_folder_path,
-            tc
-        )
-        # Clear update available flag after updating
-        self._save_plugin_update_available(plugin, False, tc)
-        tc.message(f"Updated: Plugin {plugin.source}")
-
     def remove_registry(self, registry: RegistryDbModel, tc: AbstractCommunication):
         tc.message(f"Removing: Registry {registry.source}")
         self.database_connector.remove_registry(registry.source)
@@ -324,14 +230,14 @@ class ApplicationLogic:
     def get_registry(self, source: str) -> Optional[RegistryDbModel]:
         return self.database_connector.get_registry(source)
 
-    def get_plugins(self) -> list[PluginDbModel]:
+    def get_plugins(self) -> list[IndexedPluginDbModel]:
         return self.database_connector.get_plugins()
 
-    def get_plugin(self, source: str) -> Optional[PluginDbModel]:
+    def get_plugin(self, source: str) -> Optional[IndexedPluginDbModel]:
         return self.database_connector.get_plugin(source)
 
-    def _convert_plugin_metadata_to_registry_plugin_metadata(self,
-                                                             plugin_metadata: PluginMetaDataModel) -> RegistryPluginMetaDataModel:
+    def _convert_plugin_metadata_to_registry_plugin_metadata(self, plugin_metadata: PluginMetadataDbModel) \
+            -> RegistryPluginMetaDataModel:
         return RegistryPluginMetaDataModel(
             name=plugin_metadata.name,
             source=plugin_metadata.source,
@@ -359,93 +265,41 @@ class ApplicationLogic:
         xml_website.text = registry_plugin_metadata.website
         return etree.tostring(xml_plugin, xml_declaration=True, encoding='UTF-8', pretty_print=True)
 
-    def import_existing_plugins_to_index(self, tc: AbstractCommunication):
-        # Create a new local registry if one does not exist yet
-        if not os.path.exists(Directories.LOCAL_REGISTRY):
-            absolute_local_registry_plugins_folder = os.path.join(Directories.LOCAL_REGISTRY, 'plugins')
-            os.makedirs(absolute_local_registry_plugins_folder)
+    def install_plugin(self, plugin: IndexedPluginDbModel, tc: AbstractCommunication):
+        self.plugin_workflow_manager.install_plugin(plugin, tc)
 
-            pygit2.init_repository(Directories.LOCAL_REGISTRY, False)
+    def uninstall_plugin(self, plugin: IndexedPluginDbModel, tc: AbstractCommunication):
+        self.plugin_workflow_manager.uninstall_plugin(plugin, tc)
 
-        for entry in os.listdir(Directories.NAEV_PLUGIN_DIR):
-            absolute_installed_plugin_path = os.path.join(Directories.NAEV_PLUGIN_DIR, entry)
-            if os.path.isdir(absolute_installed_plugin_path):
-                absolute_plugin_metadata_xml_path = (
-                    os.path.join(Directories.NAEV_PLUGIN_DIR, entry, 'plugin.xml'))
-                if os.path.exists(absolute_plugin_metadata_xml_path):
-                    plugin_metadata = (
-                        self._parse_plugin_metadata_xml_file(absolute_plugin_metadata_xml_path))
-                    source = plugin_metadata.source
-                    if source is not None:
-                        # Check if plugin is already indexed ( in db )
-                        db_plugin = self.database_connector.get_plugin(source)
-                        if db_plugin is None:
-                            plugin_folder_name = self._get_folder_name_for_plugin_name_and_source(
-                                plugin_metadata.name,
-                                plugin_metadata.source
-                            )
-                            absolute_cached_plugin_folder = self._get_absolute_cached_plugin_folder_path(
-                                plugin_folder_name
-                            )
-                            self._hard_link(absolute_installed_plugin_path, absolute_cached_plugin_folder, tc)
+    def delete_plugin(self, plugin: IndexedPluginDbModel, tc: AbstractCommunication):
+        self.plugin_workflow_manager.delete_plugin(plugin, tc)
 
-                            # Rename installed plugin folder so it is identical to cached folder
-                            new_absolute_installed_plugin_path = os.path.join(Directories.NAEV_PLUGIN_DIR,
-                                                                              plugin_folder_name)
-                            os.rename(absolute_installed_plugin_path, new_absolute_installed_plugin_path)
+    def check_plugin(self, plugin: IndexedPluginDbModel, tc: AbstractCommunication):
+        self.plugin_workflow_manager.check_plugin(plugin, tc)
 
-                            # create XML representation of plugin metadata in the registry
-                            registry_plugin_metadata = self._convert_plugin_metadata_to_registry_plugin_metadata(
-                                plugin_metadata)
-                            xml = self._convert_registry_plugin_metadata_to_xml(registry_plugin_metadata)
-                            absolute_registry_plugins_folder_path = os.path.join(Directories.LOCAL_REGISTRY, 'plugins')
-                            registry_plugin_xml_file_name = plugin_folder_name + '.xml'
-                            absolute_registry_plugin_xml_path = os.path.join(absolute_registry_plugins_folder_path,
-                                                                             registry_plugin_xml_file_name)
-                            # Make sure folders exist
-                            if not os.path.exists(absolute_registry_plugins_folder_path):
-                                os.makedirs(absolute_registry_plugins_folder_path)
-                            with open(absolute_registry_plugin_xml_path, 'bw') as f:
-                                f.write(xml)
+    def update_plugin(self, plugin: IndexedPluginDbModel, tc: AbstractCommunication):
+        self.plugin_workflow_manager.update_plugin(plugin, tc)
 
-                            # Make sure local registry exists in database
-                            # TODO maybe move outside loop
-                            if not self.database_connector.exists_registry(Directories.LOCAL_REGISTRY):
-                                self.database_connector.add_registry(RegistryDbModel(
-                                    source=Directories.LOCAL_REGISTRY,
-                                    last_fetched=datetime.now(timezone.utc)
-                                ))
-                            # Add plugin to index
-                            self.database_connector.index_plugin(Directories.LOCAL_REGISTRY, registry_plugin_metadata)
-                            self.database_connector.set_plugin_state(source, PluginState.INSTALLED)
+    def fetch_plugin(self, plugin: IndexedPluginDbModel, tc: AbstractCommunication):
+        self.plugin_workflow_manager.fetch_plugin(plugin, tc)
 
-                            # Update local registry git repo
-                            local_registry_repo = pygit2.Repository(Directories.LOCAL_REGISTRY)
-                            index = local_registry_repo.index
-                            repo_relative_plugin_xml_path = os.path.join('plugins', registry_plugin_xml_file_name)
-                            index.add(repo_relative_plugin_xml_path)
-                            index.write()
-                            ref = "HEAD"
-                            author = pygit2.Signature('naev-pm', 'dummy@mail.address')
-                            committer = pygit2.Signature('naev-pm', 'dummy@mail.address')
-                            message = "Add " + repo_relative_plugin_xml_path
-                            tree = index.write_tree()
-                            parents = []
-                            local_registry_repo.create_commit(ref, author, committer, message, tree, parents)
-                        else:
-                            # Check installed plugin's state
-                            if db_plugin.state == PluginState.INDEXED:
-                                # Copy to cache and set state to INSTALLED
-                                absolute_cached_plugin_folder = self._get_absolute_cached_plugin_folder_path2(db_plugin)
-                                absolute_installed_plugin_path = os.path.join(Directories.NAEV_PLUGIN_DIR, entry)
-                                self._hard_link(absolute_installed_plugin_path, absolute_cached_plugin_folder, tc)
-                                self.database_connector.set_plugin_state(db_plugin.source, PluginState.INSTALLED)
-                            elif db_plugin.state == PluginState.CACHED:
-                                # Assume that cache is in sync with installed plugin
-                                self.database_connector.set_plugin_state(db_plugin.source, PluginState.INSTALLED)
-                                pass
-                            elif db_plugin.state == PluginState.INSTALLED:
-                                # Already imported
-                                pass
-                            else:
-                                raise NotImplementedError()
+    def remove_plugin(self, plugin: IndexedPluginDbModel, tc: AbstractCommunication):
+        self.plugin_workflow_manager.remove_plugin(plugin, tc)
+
+    def get_plugin_metadata(self, plugin: IndexedPluginDbModel, tc: AbstractCommunication) -> PluginMetadataDbModel:
+        tc.message(f"Getting: Plugin metadata {plugin.source}")
+
+        # Try the source in the registry plugin metadata first
+        # TODO A bit messy here. Maybe check somewhere if source in registry is same as in plugin.xml
+        db_plugin_metadata = self.database_connector.get_plugin_metadata(plugin.source)
+        if db_plugin_metadata is None:
+            plugin_metadata = self.parse_plugin_metadata_xml_file(plugin)
+            # Check if the source in the plugin metadata from the xml is already used
+            db_plugin_metadata2 = self.database_connector.get_plugin_metadata(plugin.source)
+            if db_plugin_metadata2 is None:
+                self.database_connector.insert_plugin_metadata(plugin_metadata)
+                return plugin_metadata
+            else:
+                return db_plugin_metadata2
+        tc.message(f"Got: Plugin metadata {plugin.source}")
+        return db_plugin_metadata

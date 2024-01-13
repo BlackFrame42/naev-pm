@@ -4,7 +4,7 @@ from typing import Optional
 import inspect
 
 
-class PluginMetaDataModel:
+class PluginMetadataDbModel:
     name: Optional[str]
     author: Optional[str]
     version: Optional[str]
@@ -70,7 +70,7 @@ class PluginState(Enum):
     INSTALLED = 2
 
 
-class PluginDbModel:
+class IndexedPluginDbModel:
     name: str
     author: Optional[str]
     source: str
@@ -115,5 +115,6 @@ class RegistryDbModel:
         self.last_fetched = last_fetched
 
 
-plugin_fields = list(inspect.get_annotations(PluginDbModel))
+indexed_plugin_fields = list(inspect.get_annotations(IndexedPluginDbModel))
+plugin_metadata_fields = list(inspect.get_annotations(PluginMetadataDbModel))
 registry_fields = list(inspect.get_annotations(RegistryDbModel))

@@ -8,16 +8,17 @@ from naevpm.core import models
 from naevpm.core.abstract_thread_communication import AbstractCommunication
 from naevpm.core.application_logic import ApplicationLogic, ApplicationLogicRegistrySourceWasAlreadyAdded, \
     ApplicationLogicEmptyRegistrySource
-from naevpm.core.directories import Directories
-from naevpm.core.models import PluginDbModel, RegistryDbModel
+from naevpm.core.config import Config
+from naevpm.core.models import IndexedPluginDbModel, RegistryDbModel
 from naevpm.core.sqlite_database_connector import SqliteDatabaseConnector
 from naevpm.gui import display_utils
 from naevpm.gui.data_model_to_str_list import registry_to_str_list, plugin_to_str_list
 
+config = Config()
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
-database_connector = SqliteDatabaseConnector(Directories.DATABASE)
-logic = ApplicationLogic(database_connector)
+database_connector = SqliteDatabaseConnector(config.DATABASE)
+logic = ApplicationLogic(database_connector, config)
 
 
 class Communication(AbstractCommunication):
@@ -61,7 +62,7 @@ def registry():
     pass
 
 
-def create_plugin_table(plugins: list[PluginDbModel]):
+def create_plugin_table(plugins: list[IndexedPluginDbModel]):
     table = []
     for p in plugins:
         table.append(plugin_to_str_list(p))
@@ -142,7 +143,7 @@ def plugin():
 def plugin_list():
     plugins = logic.get_plugins()
     print(tabulate(create_plugin_table(plugins),
-                   headers=[display_utils.field_name_as_list_header(field) for field in models.plugin_fields]))
+                   headers=[display_utils.field_name_as_list_header(field) for field in models.indexed_plugin_fields]))
 
 
 @plugin.command('delete')
@@ -153,7 +154,7 @@ def plugin_delete(source: str):
         logger.warning('Plugin is not in index')
     else:
         try:
-            logic.delete_plugin_from_cache(p, comm)
+            logic.delete_plugin(p, comm)
         except AssertionError:
             logger.error(f'Operation invalid for state {p.state.name} of plugin.')
 
@@ -179,7 +180,7 @@ def plugin_install(source: str):
         logger.warning('Plugin is not in index')
     else:
         try:
-            logic.install_plugin_from_cache(p, comm)
+            logic.install_plugin(p, comm)
         except AssertionError:
             logger.error(f'Operation invalid for state {p.state.name} of plugin.')
 
@@ -192,7 +193,7 @@ def plugin_remove(source: str):
         logger.warning('Plugin is not in index')
     else:
         try:
-            logic.remove_plugin_from_index(p, comm)
+            logic.remove_plugin(p, comm)
         except AssertionError:
             logger.error(f'Operation invalid for state {p.state.name} of plugin.')
 
@@ -231,7 +232,7 @@ def plugin_check_for_update(source: str):
         logger.warning('Plugin is not in index')
     else:
         try:
-            logic.check_for_plugin_update(p, comm)
+            logic.check_plugin(p, comm)
         except AssertionError:
             logger.error(f'Operation invalid for state {p.state.name} of plugin.')
 
@@ -241,7 +242,7 @@ def plugin_check_for_update():
     plugins = logic.get_plugins()
     for p in plugins:
         if p.state == models.PluginState.INSTALLED:
-            logic.check_for_plugin_update(p, comm)
+            logic.check_plugin(p, comm)
 
 
 if __name__ == '__main__':

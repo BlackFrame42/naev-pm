@@ -5,7 +5,7 @@ from naevpm.core.models import registry_fields, RegistryDbModel
 from naevpm.gui.abstract_gui_controller import AbstractGuiController
 from naevpm.gui.add_registry_window import AddRegistryWindow
 from naevpm.gui.data_model_to_str_list import registry_to_str_list
-from naevpm.gui.display_utils import display_last_datetime, field_name_as_list_header
+from naevpm.gui.display_utils import field_name_as_list_header
 from naevpm.gui.synced_tree_view import SyncedTreeView
 
 from naevpm.gui.tk_root import TkRoot
@@ -32,7 +32,7 @@ class RegistriesFrame(ttk.Frame):
         buttons_frame.grid(column=0, row=0, sticky='NSEW', **Config.GLOBAL_GRID_PADDING)
         buttons_frame.columnconfigure(0, weight=1)
 
-        add_button = ttk.Button(buttons_frame, text="Add repository", command=self.add_registry_window.show)
+        add_button = ttk.Button(buttons_frame, text="Add registry", command=self.add_registry_window.show)
         add_button.grid(column=0, row=0, sticky='E', **Config.GLOBAL_GRID_PADDING)
 
         def import_installed_plugins():
@@ -79,7 +79,6 @@ class RegistriesFrame(ttk.Frame):
             registry = self._registries_list.get_object_by_iid(list_item_context_menu.item_id)
             gui_controller.remove_registry(registry)
             self._registries_list.focus_set()
-
 
         list_item_context_menu.add_command(
             label='Remove registry',

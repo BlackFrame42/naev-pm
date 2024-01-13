@@ -1,13 +1,14 @@
 import logging
-from tkinter import StringVar, messagebox
+from tkinter import messagebox
 from typing import Optional, Any
 
 from naevpm.core.application_logic import ApplicationLogic, ApplicationLogicRegistrySourceWasAlreadyAdded, \
     ApplicationLogicEmptyRegistrySource
-from naevpm.core.models import PluginDbModel, RegistryDbModel, PluginState, PluginMetaDataModel
+from naevpm.core.models import IndexedPluginDbModel, RegistryDbModel, PluginState, PluginMetadataDbModel
 
 from naevpm.core.sqlite_database_connector import SqliteDatabaseConnector
 from naevpm.gui.abstract_gui_controller import AbstractGuiController
+from naevpm.gui.naevpm_frame import NaevPmFrame
 
 from naevpm.gui.plugins_frame import PluginsFrame
 from naevpm.gui.registries_frame import RegistriesFrame
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 class GuiController(AbstractGuiController):
     registries_frame: RegistriesFrame = None
     plugins_frame: PluginsFrame = None
-    status_text: StringVar = None
+    naevpm_frame: NaevPmFrame = None
     root: TkRoot
     tk_threading: TkThreading
 
@@ -102,10 +103,10 @@ class GuiController(AbstractGuiController):
         self.tk_threading.run_threaded_task('fetch_registry_plugin_metadatas', task, callback)
 
     def refresh_plugins_list(self):
-        def task(tc: ThreadCommunication) -> list[PluginDbModel]:
+        def task(tc: ThreadCommunication) -> list[IndexedPluginDbModel]:
             return self.database_connector.get_plugins()
 
-        def callback(plugins: list[PluginDbModel], e: Optional[Exception] = None):
+        def callback(plugins: list[IndexedPluginDbModel], e: Optional[Exception] = None):
             # Reraise in GUI thread if not handled
             if e is not None:
                 self.show_status(f'Unhandled error occurred: {str(e)}')
@@ -114,9 +115,9 @@ class GuiController(AbstractGuiController):
 
         self.tk_threading.run_threaded_task('refresh_plugins_list', task, callback)
 
-    def install_plugin_from_cache(self, plugin: PluginDbModel):
+    def install_plugin(self, plugin: IndexedPluginDbModel):
         def task(tc: ThreadCommunication):
-            self.application_logic.install_plugin_from_cache(plugin, tc)
+            self.application_logic.install_plugin(plugin, tc)
 
         def callback(return_value: Any, e: Optional[Exception] = None):
             # Reraise in GUI thread if not handled
@@ -126,7 +127,7 @@ class GuiController(AbstractGuiController):
 
         self.tk_threading.run_threaded_task('install_plugin_from_cache', task, callback)
 
-    def uninstall_plugin(self, plugin: PluginDbModel):
+    def uninstall_plugin(self, plugin: IndexedPluginDbModel):
         def task(tc: ThreadCommunication):
             self.application_logic.uninstall_plugin(plugin, tc)
 
@@ -139,9 +140,9 @@ class GuiController(AbstractGuiController):
 
         self.tk_threading.run_threaded_task('uninstall_plugin', task, callback)
 
-    def delete_plugin_from_cache(self, plugin: PluginDbModel):
+    def delete_plugin(self, plugin: IndexedPluginDbModel):
         def task(tc: ThreadCommunication):
-            self.application_logic.delete_plugin_from_cache(plugin, tc)
+            self.application_logic.delete_plugin(plugin, tc)
 
         def callback(return_value: Any, e: Optional[Exception] = None):
             # Reraise in GUI thread if not handled
@@ -152,9 +153,9 @@ class GuiController(AbstractGuiController):
 
         self.tk_threading.run_threaded_task('delete_plugin_from_cache', task, callback)
 
-    def check_for_plugin_update(self, plugin: PluginDbModel):
+    def check_plugin(self, plugin: IndexedPluginDbModel):
         def task(tc: ThreadCommunication):
-            self.application_logic.check_for_plugin_update(plugin, tc)
+            self.application_logic.check_plugin(plugin, tc)
 
         def callback(return_value: Any, e: Optional[Exception] = None):
             # Reraise in GUI thread if not handled
@@ -165,7 +166,7 @@ class GuiController(AbstractGuiController):
 
         self.tk_threading.run_threaded_task('check_for_plugin_update', task, callback)
 
-    def update_plugin(self, plugin: PluginDbModel):
+    def update_plugin(self, plugin: IndexedPluginDbModel):
         def task(tc: ThreadCommunication):
             self.application_logic.update_plugin(plugin, tc)
 
@@ -178,12 +179,12 @@ class GuiController(AbstractGuiController):
 
         self.tk_threading.run_threaded_task('update_plugin', task, callback)
 
-    def check_for_plugin_updates(self, plugins: list[PluginDbModel]):
+    def check_for_plugin_updates(self, plugins: list[IndexedPluginDbModel]):
         for plugin in plugins:
             if plugin.state == PluginState.INSTALLED:
-                self.check_for_plugin_update(plugin)
+                self.check_plugin(plugin)
 
-    def fetch_plugin(self, plugin: PluginDbModel):
+    def fetch_plugin(self, plugin: IndexedPluginDbModel):
         def task(tc: ThreadCommunication):
             self.application_logic.fetch_plugin(plugin, tc)
 
@@ -197,9 +198,9 @@ class GuiController(AbstractGuiController):
 
         self.tk_threading.run_threaded_task('fetch_plugin', task, callback)
 
-    def remove_plugin_from_index(self, plugin: PluginDbModel):
+    def remove_plugin(self, plugin: IndexedPluginDbModel):
         def task(tc: ThreadCommunication):
-            self.application_logic.remove_plugin_from_index(plugin, tc)
+            self.application_logic.remove_plugin(plugin, tc)
 
         def callback(return_value: Any, e: Optional[Exception] = None):
             # Reraise in GUI thread if not handled
@@ -211,14 +212,13 @@ class GuiController(AbstractGuiController):
         self.tk_threading.run_threaded_task('remove_plugin_from_index', task, callback)
 
     def show_status(self, value: str):
-        self.status_text.set(value)
+        self.naevpm_frame.add_log_line(value)
 
-    def show_plugin_details(self, plugin: PluginDbModel):
+    def show_plugin_details(self, plugin: IndexedPluginDbModel):
         def task(tc: ThreadCommunication):
-            plugin_meta_data = self.application_logic.parse_plugin_metadata_xml_file(plugin)
-            return plugin_meta_data
+            return self.application_logic.get_plugin_metadata(plugin, tc)
 
-        def callback(plugin_meta_data: PluginMetaDataModel, e: Optional[Exception] = None):
+        def callback(plugin_meta_data: PluginMetadataDbModel, e: Optional[Exception] = None):
             # Reraise in GUI thread if not handled
             if e is not None:
                 self.show_status(f'Unhandled error occurred: {str(e)}')
@@ -229,7 +229,8 @@ class GuiController(AbstractGuiController):
 
     def import_existing_plugins_to_index(self):
         def task(tc: ThreadCommunication):
-            self.application_logic.import_existing_plugins_to_index(tc)
+            raise NotImplementedError('Not yet implemented')
+            # self.application_logic.import_existing_plugins_to_index(tc)
 
         def callback(return_value, e: Optional[Exception] = None):
             # Reraise in GUI thread if not handled
@@ -240,4 +241,3 @@ class GuiController(AbstractGuiController):
             self.refresh_registries_list()
 
         self.tk_threading.run_threaded_task('remove_plugin_from_index', task, callback)
-

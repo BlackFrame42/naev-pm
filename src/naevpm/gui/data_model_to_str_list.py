@@ -1,5 +1,5 @@
 from naevpm.core import models
-from naevpm.core.models import PluginDbModel, RegistryDbModel
+from naevpm.core.models import IndexedPluginDbModel, RegistryDbModel
 from naevpm.gui import display_utils
 
 
@@ -17,10 +17,10 @@ def registry_to_str_list(registry: RegistryDbModel) -> list[str]:
     return row
 
 
-def plugin_to_str_list(plugin: PluginDbModel) -> list[str]:
+def plugin_to_str_list(plugin: IndexedPluginDbModel) -> list[str]:
     obj = plugin.__dict__
     row = []
-    for field in models.plugin_fields:
+    for field in models.indexed_plugin_fields:
         if field == 'installed' or \
                 field == 'cached' or \
                 field == 'update_available':

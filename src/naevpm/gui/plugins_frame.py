@@ -1,17 +1,17 @@
-from tkinter import ttk, E, DISABLED, NORMAL, StringVar, Event, font
+from tkinter import ttk, E, DISABLED, NORMAL, StringVar, Event, font, NO, HORIZONTAL
 
 from naevpm.core.config import Config
-from naevpm.core.models import plugin_fields, PluginDbModel, PluginState, PluginMetaDataModel
+from naevpm.core.models import indexed_plugin_fields, IndexedPluginDbModel, PluginState, PluginMetadataDbModel
 from naevpm.gui.abstract_gui_controller import AbstractGuiController
 from naevpm.gui.data_model_to_str_list import plugin_to_str_list
-from naevpm.gui.display_utils import field_name_as_list_header, display_boolean
+from naevpm.gui.display_utils import field_name_as_list_header
 from naevpm.gui.synced_tree_view import SyncedTreeView
 from naevpm.gui.tk_root import TkRoot
 from naevpm.gui.treeview_context_menu import TreeviewContextMenu
 
 
 class PluginsFrame(ttk.Frame):
-    _plugins_list: SyncedTreeView[PluginDbModel]
+    _plugins_list: SyncedTreeView[IndexedPluginDbModel]
 
     plugin_name_var: StringVar
     plugin_author_var: StringVar
@@ -24,6 +24,8 @@ class PluginsFrame(ttk.Frame):
         self.plugin_author_var = StringVar()
         self.plugin_version_var = StringVar()
         self.plugin_description_var = StringVar()
+        # Workaround to set a minimum height of the plugin details frame
+        self.plugin_description_var.set("-----------------------------------------" * 15)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
@@ -38,36 +40,36 @@ class PluginsFrame(ttk.Frame):
         check_for_updates_button = ttk.Button(buttons_frame, text="Check for updates", command=check_for_updates)
         check_for_updates_button.grid(column=0, row=0, sticky=E, **Config.GLOBAL_GRID_PADDING)
 
-        content_frame = ttk.Frame(self)
-        content_frame.grid(column=0, row=1, sticky='NSEW', **Config.GLOBAL_GRID_PADDING)
-        content_frame.columnconfigure(0, weight=1)
-        content_frame.rowconfigure(0, weight=1)
+        paned_window = ttk.Panedwindow(self, orient=HORIZONTAL)
+        paned_window.grid(column=0, row=1, sticky='NSEW', **Config.GLOBAL_GRID_PADDING)
 
         # Plugins list ----------------------------------------------
-        list_frame = ttk.Frame(content_frame)
-        list_frame.grid(column=0, row=0, sticky='NSEW', **Config.GLOBAL_GRID_PADDING)
+        list_frame = ttk.Frame(paned_window)
         list_frame.columnconfigure(0, weight=1)
-        list_frame.columnconfigure(1, weight=1)
-        list_frame.columnconfigure(2, weight=1)
         list_frame.rowconfigure(0, weight=1)
+        paned_window.add(list_frame)
 
-        def get_object_identifier(r: PluginDbModel):
+        def get_object_identifier(r: IndexedPluginDbModel):
             return r.source
 
         self._plugins_list = SyncedTreeView(
             get_str_values_fn=plugin_to_str_list,
             get_object_identifier_fn=get_object_identifier,
-            master=content_frame,
-            columns=plugin_fields,
+            master=list_frame,
+            columns=indexed_plugin_fields,
             show='headings',
             selectmode='browse')
-        plugin_list_scrollbar = ttk.Scrollbar(content_frame,
+        plugin_list_scrollbar = ttk.Scrollbar(list_frame,
                                               orient="vertical",
                                               command=self._plugins_list.yview)
         plugin_list_scrollbar.grid(column=1, row=0, sticky='NSE')
         self._plugins_list.configure(yscrollcommand=plugin_list_scrollbar.set)
-        for plugin_field in plugin_fields:
+        for plugin_field in indexed_plugin_fields:
             self._plugins_list.heading(plugin_field, text=field_name_as_list_header(plugin_field))
+            if plugin_field == 'state':
+                self._plugins_list.column(plugin_field, minwidth=0, width=70, stretch=NO)
+            elif plugin_field == 'update_available':
+                self._plugins_list.column(plugin_field, minwidth=0, width=120, stretch=NO)
         self._plugins_list.grid(column=0, row=0, sticky='NSEW')
 
         def configure_context_menu(iid: str):
@@ -102,19 +104,18 @@ class PluginsFrame(ttk.Frame):
 
         self.list_item_context_menu = TreeviewContextMenu(self._plugins_list, root, configure_context_menu)
 
-        plugin_details_frame = ttk.Frame(content_frame, width=400, height=400)
-        plugin_details_frame.grid(column=2, row=0, sticky='NES', **Config.GLOBAL_GRID_PADDING)
-        # TODO understand grid propagate to set fix plugin details frame width..
-        # plugin_details_frame.grid_propagate(False)
+        plugin_details_frame = ttk.Frame(paned_window)
         plugin_details_frame.columnconfigure(0, weight=1)
-        # plugin_details_frame.rowconfigure(0, weight=1)
+        paned_window.add(plugin_details_frame)
 
         bold_font = font.Font(weight="bold")
 
         name_label = ttk.Label(plugin_details_frame, text="Name")
         name_label.grid(column=0, row=0, sticky='NEW')
+        # The width for the label seems to work. It sets a minimum width for the plugin
+        # details frame
         name_text = ttk.Label(plugin_details_frame, textvariable=self.plugin_name_var, font=bold_font,
-                              wraplength=300)
+                              wraplength=300, width=30)
         name_text.grid(column=0, row=1, sticky='NEW')
 
         author_label = ttk.Label(plugin_details_frame, text="Author(s)")
@@ -135,6 +136,7 @@ class PluginsFrame(ttk.Frame):
                                      wraplength=300)
         description_text.grid(column=0, row=7, sticky='NEW')
 
+        # noinspection PyUnusedLocal
         def show_plugin_details(ev: Event):
             plugin = self._plugins_list.get_selected_object()
             if plugin is not None and plugin.state in [PluginState.CACHED, PluginState.INSTALLED]:
@@ -149,7 +151,7 @@ class PluginsFrame(ttk.Frame):
 
         def remove_plugin_from_index():  # 0
             plugin = self._plugins_list.get_object_by_iid(self.list_item_context_menu.item_id)
-            gui_controller.remove_plugin_from_index(plugin)
+            gui_controller.remove_plugin(plugin)
             self._plugins_list.focus_set()
 
         self.list_item_context_menu.add_command(label='Remove plugin from index',
@@ -166,14 +168,14 @@ class PluginsFrame(ttk.Frame):
 
         def delete_plugin_from_cache():  # 2
             plugin = self._plugins_list.get_object_by_iid(self.list_item_context_menu.item_id)
-            gui_controller.delete_plugin_from_cache(plugin)
+            gui_controller.delete_plugin(plugin)
 
         self.list_item_context_menu.add_command(label='Delete plugin from cache',
                                                 command=delete_plugin_from_cache)
 
         def install_plugin_from_cache():  # 3
             plugin = self._plugins_list.get_object_by_iid(self.list_item_context_menu.item_id)
-            gui_controller.install_plugin_from_cache(plugin)
+            gui_controller.install_plugin(plugin)
 
         self.list_item_context_menu.add_command(label='Install plugin from cache',
                                                 command=install_plugin_from_cache)
@@ -187,7 +189,7 @@ class PluginsFrame(ttk.Frame):
 
         def check_for_plugin_update():  # 5
             plugin = self._plugins_list.get_object_by_iid(self.list_item_context_menu.item_id)
-            gui_controller.check_for_plugin_update(plugin)
+            gui_controller.check_plugin(plugin)
 
         self.list_item_context_menu.add_command(label='Check for plugin update',
                                                 command=check_for_plugin_update)
@@ -200,23 +202,23 @@ class PluginsFrame(ttk.Frame):
                                                 command=update_plugin)
 
     # Functions for use by GUI controller -----------------------------------------
-    def put_plugin(self, plugin: PluginDbModel):
+    def put_plugin(self, plugin: IndexedPluginDbModel):
         self._plugins_list.sync_put(plugin)
 
-    def put_plugins(self, plugins: list[PluginDbModel]):
+    def put_plugins(self, plugins: list[IndexedPluginDbModel]):
         self._plugins_list.sync_put_all(plugins)
 
     def clear_plugins(self):
         self._plugins_list.sync_clear()
 
-    def update_plugin(self, plugin: PluginDbModel):
+    def update_plugin(self, plugin: IndexedPluginDbModel):
         self._plugins_list.sync_update(plugin)
 
-    def remove_plugin(self, plugin: PluginDbModel):
+    def remove_plugin(self, plugin: IndexedPluginDbModel):
         self._plugins_list.sync_remove(plugin)
 
-    def show_plugin_details(self, plugin: PluginDbModel, plugin_meta_data: PluginMetaDataModel):
-        if self._plugins_list.get_selected_object() is plugin:
+    def show_plugin_details(self, plugin: IndexedPluginDbModel, plugin_meta_data: PluginMetadataDbModel):
+        if self._plugins_list.get_selected_object() is plugin and plugin_meta_data is not None:
             self.plugin_name_var.set(plugin_meta_data.name)
             self.plugin_author_var.set(plugin_meta_data.author)
             self.plugin_version_var.set(plugin_meta_data.version)
