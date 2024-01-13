@@ -47,7 +47,7 @@ class PluginsFrame(ttk.Frame):
         list_frame = ttk.Frame(paned_window)
         list_frame.columnconfigure(0, weight=1)
         list_frame.rowconfigure(0, weight=1)
-        paned_window.add(list_frame)
+        paned_window.add(list_frame, weight=1)
 
         def get_object_identifier(r: IndexedPluginDbModel):
             return r.source
@@ -106,7 +106,7 @@ class PluginsFrame(ttk.Frame):
 
         plugin_details_frame = ttk.Frame(paned_window)
         plugin_details_frame.columnconfigure(0, weight=1)
-        paned_window.add(plugin_details_frame)
+        paned_window.add(plugin_details_frame, weight=1)
 
         bold_font = font.Font(weight="bold")
 
