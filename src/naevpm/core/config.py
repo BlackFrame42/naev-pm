@@ -33,5 +33,3 @@ class Config:
             os.makedirs(self.LOCAL_REGISTRY)
         if not os.path.exists(self.PLUGINS_CACHE):
             os.makedirs(self.PLUGINS_CACHE)
-        if not os.path.exists(self.LOCAL_REGISTRY):
-            os.makedirs(self.LOCAL_REGISTRY)

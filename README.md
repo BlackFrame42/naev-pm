@@ -1,36 +1,42 @@
 # NAEV PLUGIN MANAGER
+
 > **Warning**
 > **This is a proof of concept.** naev-pm is extreme alpha and not production ready at all.
 
-Plugin registry manager for Naev. This is not official Naev-related software.
+Plugin manager for Naev. This is not official Naev-related software.
 
 Links to resources:
-- https://github.com/naev/naev/blob/main/docs/manual/sec/plugins.md
+- What is a Naev plugin? https://github.com/naev/naev/blob/main/docs/manual/sec/plugins.md
+- Official plugin registry: https://github.com/naev/naev-plugins
+- Naev the game: https://github.com/naev/naev
 
 ## Usage
 
-Change directory into src/
-Create venv and install requirements
+### Linux
 
-    python -m venv venv
-    . venv\bin\activate
-    pip install -r requirements.txt
+Setup python venv:
+
+    [naev-pm]$ python -m venv temp/venv
+    [naev-pm]$ . temp/venv/bin/activate
+    (venv)[naev-pm]$ pip install -r requirements.txt
 
 For GUI run
 
-    python -m naevpm.gui.start
+    (venv)[naev-pm]$ cd src
+    (venv)[src]$ python -m naevpm.gui.start
 
-or run the cli tool with 
+for CLI tool run
 
-    python -m naevpm.cli
+    (venv)[src]$ python -m naevpm.cli
 
-or change to main directory above src/ and install it as a package.
+or install it as a package.
 
-    pip install .
+    (venv)[src]$ cd ..
+    (venv)[naev-pm]$ pip install .
 
-It creates the cli commands 'naevpm' and 'naevpm-gui'.   
+It creates the CLI commands 'naevpm' and 'naevpm-gui'.   
 
-    $ naevpm registry --help
+    (venv)[naev-pm]$  naevpm registry --help
     Usage: naevpm registry [OPTIONS] COMMAND [ARGS]...
     
     Options:
@@ -43,7 +49,7 @@ It creates the cli commands 'naevpm' and 'naevpm-gui'.
       list
       remove
 
-    $ naevpm plugin --help
+    (venv)[naev-pm]$  naevpm plugin --help
     Usage: naevpm plugin [OPTIONS] COMMAND [ARGS]...
     
     Options:
@@ -60,20 +66,15 @@ It creates the cli commands 'naevpm' and 'naevpm-gui'.
       uninstall
       update
 
+### Windows
+
+There is an experimental prerelease build for Windows. It is an exe which opens the GUI.
+Release page: https://github.com/BlackFrame42/naev-pm/releases/tag/0.2.1
+
 ## Example screenshots
 ![GUI Screen Shots](Screenshot%20from%202024-01-13%2022-18-32.png "GUI Screen Shots")
 ![GUI Screen Shots](Screenshot%20from%202024-01-13%2022-18-37.png "GUI Screen Shots")
 
-## Tests
+## Development
 
-    (venv)[naev-pm]$ python -m unittest discover -s tests/
-
-## Coverage
-
-    (venv)[naev-pm]$ coverage run -m unittest discover -s tests/
-    (venv)[naev-pm]$ coverage report -m 
-    (venv)[naev-pm]$ coverage html
-
-# PyInstaller
-
-    pyinstaller --onefile --windowed --paths=C:\Users\me\Documents\naev-pm\src\venv\Lib\site-packages --add-data naevpm\gui\resources\icon2.png:naevpm\gui\resources\  --icon naevpm\gui\resources\icon2.png --name naevpm naevpm\gui\start.py
+Read [development.md](development.md) for more details.

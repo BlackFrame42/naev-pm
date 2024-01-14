@@ -8,5 +8,5 @@ venv
 *.egg-info
 build/
 .idea
-src/.coverage
+.coverage
 temp/
