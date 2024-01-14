@@ -17,7 +17,7 @@ class Config:
 
     def __init__(self,
                  naevpm_root: Optional[str] = appdirs.user_data_dir("naev-package-manager"),
-                 naev_root: Optional[str] = appdirs.user_data_dir("naev")):
+                 naev_root: Optional[str] = appdirs.user_data_dir("naev", appauthor=False, roaming=True)):
         super().__init__()
 
         self.PM_ROOT = naevpm_root

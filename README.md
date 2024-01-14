@@ -9,7 +9,14 @@ Links to resources:
 
 ## Usage
 
-Change directory into src/ and run
+Change directory into src/
+Create venv and install requirements
+
+    python -m venv venv
+    . venv\bin\activate
+    pip install -r requirements.txt
+
+For GUI run
 
     python -m naevpm.gui.start
 
@@ -17,10 +24,8 @@ or run the cli tool with
 
     python -m naevpm.cli
 
-or change to main directory above src/ and install it as a package (creating venv advised).
+or change to main directory above src/ and install it as a package.
 
-    python -m venv venv
-    . venv\bin\activate
     pip install .
 
 It creates the cli commands 'naevpm' and 'naevpm-gui'.   
@@ -68,3 +73,7 @@ It creates the cli commands 'naevpm' and 'naevpm-gui'.
     (venv)[naev-pm]$ coverage run -m unittest discover -s tests/
     (venv)[naev-pm]$ coverage report -m 
     (venv)[naev-pm]$ coverage html
+
+# PyInstaller
+
+    pyinstaller --onefile --windowed --paths=C:\Users\me\Documents\naev-pm\src\venv\Lib\site-packages --add-data naevpm\gui\resources\icon2.png:naevpm\gui\resources\  --icon naevpm\gui\resources\icon2.png --name naevpm naevpm\gui\start.py

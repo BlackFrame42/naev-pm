@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from hashlib import md5
 from typing import Optional
 from lxml import etree
-from urllib.parse import quote
 
 from naevpm.core import git_utils
 from naevpm.core.abstract_thread_communication import AbstractCommunication
@@ -42,31 +41,12 @@ class ApplicationLogic:
         # source cannot be directly used as a unique folder name. Create a hash encoded in base64 instead.
         return base64.urlsafe_b64encode(md5(source.encode('utf-8')).digest()).decode('utf-8') + '_' + basename
 
-    def _get_folder_name_for_plugin_name_and_source(self, name: str, source: str):
-        encoded_name = quote(name)
-        return base64.urlsafe_b64encode(md5(source.encode('utf-8')).digest()).decode(
-            'utf-8') + '_' + encoded_name
-
-    def _get_folder_name_for_plugin(self, plugin: IndexedPluginDbModel) -> str:
-        return self._get_folder_name_for_plugin_name_and_source(plugin.name, plugin.source)
-
     def _get_absolute_registry_folder_path(self, registry_folder_name: str) -> str:
         return os.path.join(self.config.REGISTRIES, registry_folder_name)
 
     def _get_absolute_registry_folder_path2(self, registry: RegistryDbModel):
         registry_folder_name = self._get_folder_name_for_registry(registry.source)
         return self._get_absolute_registry_folder_path(registry_folder_name)
-
-    def _get_absolute_cached_plugin_folder_path(self, plugin_folder_name: str) -> str:
-        return os.path.join(self.config.PLUGINS_CACHE, plugin_folder_name)
-
-    def _get_absolute_cached_plugin_folder_path2(self, plugin: IndexedPluginDbModel) -> str:
-        plugin_folder_name = self._get_folder_name_for_plugin(plugin)
-        return os.path.join(self.config.PLUGINS_CACHE, plugin_folder_name)
-
-    def _get_absolute_cached_plugin_xml_path(self, plugin: IndexedPluginDbModel) -> str:
-        absolute_cached_plugin_folder_path = self._get_absolute_cached_plugin_folder_path2(plugin)
-        return os.path.join(absolute_cached_plugin_folder_path, 'plugin.xml')
 
     def _all_plugin_metadata_file_paths(self, folder: str) -> list[str]:
         xml_files = []
@@ -120,8 +100,8 @@ class ApplicationLogic:
             return self._parse_plugin_metadata_xml_string(text_content)
 
     def parse_plugin_metadata_xml_file(self, plugin: IndexedPluginDbModel) -> Optional[PluginMetadataDbModel]:
+        cache_location, install_location = self.plugin_workflow_manager.get_locations(plugin)
         if plugin.source.endswith('.zip'):
-            cache_location, install_location = self.plugin_workflow_manager.get_locations(plugin)
             with zipfile.ZipFile(cache_location) as z:
                 fd = None
                 try:
@@ -133,7 +113,7 @@ class ApplicationLogic:
                     if fd is not None:
                         fd.close()
         else:
-            file_path = self._get_absolute_cached_plugin_xml_path(plugin)
+            file_path = os.path.join(cache_location, 'plugin.xml')
             return self._parse_plugin_metadata_xml_file(file_path)
 
     def _read_cached_registry(self, absolute_registry_folder_path: str) -> list[RegistryPluginMetaDataModel]:
