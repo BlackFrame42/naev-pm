@@ -10,7 +10,7 @@ class AddRegistryWindow(Toplevel):
     _source_entry: ttk.Entry
 
     def __init__(self, root: TkRoot, gui_controller: AbstractGuiController, **kwargs):
-        title = 'Add Repository'
+        title = 'Add Registry'
         # class_ needs to be set to the title to show the right text in the window switcher
         super().__init__(root, class_=title, **kwargs)
         self.title(title)
