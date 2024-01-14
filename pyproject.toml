@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "naevpm"
-version = "0.2.0"
+version = "0.2.1"
 description = "Naev Package Manager"
 authors = [
     { name = "Lemuria" },
